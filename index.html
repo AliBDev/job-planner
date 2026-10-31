@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Job Planner">
+<meta name="apple-mobile-web-app-title" content="Custom Remaps">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -355,6 +355,8 @@ body.boardmode::before{background:#0B0F13}
   min-height:calc(100vh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:clamp(12px,1.3vw,32px);
   padding-block:clamp(14px,1.6vw,40px);padding-left:max(16px,2vw,env(safe-area-inset-left,0px));padding-right:max(16px,2vw,env(safe-area-inset-right,0px))}
 .b-top{display:flex;align-items:flex-end;gap:2vw;flex-wrap:wrap}
+.brand{display:block;height:20px;width:auto;max-width:70%;align-self:flex-start}
+.b-logo{display:block;height:clamp(36px,4.2vw,100px);width:auto;align-self:center;margin-right:1vw}
 .b-eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--b-mute);font-size:clamp(12px,1vw,22px)}
 .b-top h1{margin:0;font-family:var(--display);font-weight:700;font-size:clamp(24px,2.6vw,62px);line-height:1.05}
 .b-sum{display:flex;gap:2vw;flex-wrap:wrap;margin-left:auto;font-size:clamp(14px,1.3vw,30px);color:var(--b-mute)}
@@ -700,7 +702,7 @@ function totalUnread(){return threadKeys().reduce((a,k)=>a+unread(k),0)}
 
 /* ---------- render ---------- */
 function showState(title,msg){
-  $('#top-inner').innerHTML='<div class="toprow"><div><div class="eyebrow">Custom Remaps · Job Planner</div><h1>'+esc(title)+'</h1></div></div>';
+  $('#top-inner').innerHTML='<img class="brand" src="assets/logo-app.png" alt="Custom Remaps UK"><div class="toprow"><div><div class="eyebrow">Custom Remaps · Job Planner</div><h1>'+esc(title)+'</h1></div></div>';
   $('#view').innerHTML='<div class="state"><p>'+esc(msg)+'</p></div>';
   $('#nav').hidden=true;$('#fab').hidden=true;
 }
@@ -738,7 +740,7 @@ function renderTop(){
   else if(S.tab==='money'){title='Money';eyebrow=longDay(today())}
   else{title='Team';eyebrow=S.techs.length+(S.techs.length===1?' technician':' technicians')}
   const sbtn=S.tab==='schedule'?'<button class="hbtn" data-act="search" aria-label="Find a job">'+ICON.search+'</button>':'';
-  $('#top-inner').innerHTML='<div class="toprow"><div><div class="eyebrow">'+esc(eyebrow)+'</div><h1>'+esc(title)+'</h1></div><span class="tright">'+sbtn+role+'</span></div>'+extra;
+  $('#top-inner').innerHTML='<img class="brand" src="assets/logo-app.png" alt="Custom Remaps UK"><div class="toprow"><div><div class="eyebrow">'+esc(eyebrow)+'</div><h1>'+esc(title)+'</h1></div><span class="tright">'+sbtn+role+'</span></div>'+extra;
 }
 function renderNav(){
   $('#nav').hidden=false;
@@ -1433,7 +1435,7 @@ function renderBoard(){
   const tmrTxt='Tomorrow: '+tmrList.length+(tmrList.length===1?' unit job':' unit jobs')+(tf?' · first at '+esc(tf.start||'')+(tf.reg?' · '+esc(tf.reg):'')+(tf.vehicle?' '+esc(tf.vehicle):''):'');
   const off=!!S.offline;
   el.innerHTML=(off?'<div class="b-offbar" role="alert">Connection lost. Reconnecting… This screen may be out of date.</div>':'')+
-    '<header class="b-top"><div><div class="b-eyebrow">Unit jobs</div><h1>'+esc(longDay(t))+'</h1></div>'+
+    '<header class="b-top"><img class="b-logo" src="assets/logo-tv.png" alt="Custom Remaps UK"><div><div class="b-eyebrow">Unit jobs</div><h1>'+esc(longDay(t))+'</h1></div>'+
     '<div class="b-sum"><span><b>'+next.length+'</b> to do</span><span><b>'+prog.length+'</b> in progress</span><span><b>'+done.length+'</b> done</span></div>'+
     '<div class="b-clock" id="b-clock">'+clockHTML(now)+'</div></header>'+
     '<div class="b-grid">'+col('Up next',next,'next','Nothing waiting. New unit jobs appear here as soon as they are booked.')+col('In progress',prog,'prog','No cars being worked on right now.')+col('Done today',done,'done','Nothing finished yet today.',6)+'</div>'+
