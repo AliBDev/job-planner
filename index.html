@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Custom Remaps – Job Planner</title>
+<title>Custom Remaps</title>
 <meta name="theme-color" content="#141A21">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
@@ -702,7 +702,7 @@ function totalUnread(){return threadKeys().reduce((a,k)=>a+unread(k),0)}
 
 /* ---------- render ---------- */
 function showState(title,msg){
-  $('#top-inner').innerHTML='<img class="brand" src="assets/logo-app.png" alt="Custom Remaps UK"><div class="toprow"><div><div class="eyebrow">Custom Remaps · Job Planner</div><h1>'+esc(title)+'</h1></div></div>';
+  $('#top-inner').innerHTML='<img class="brand" src="assets/logo-app.png" alt="Custom Remaps UK"><div class="toprow"><div><div class="eyebrow">Custom Remaps</div><h1>'+esc(title)+'</h1></div></div>';
   $('#view').innerHTML='<div class="state"><p>'+esc(msg)+'</p></div>';
   $('#nav').hidden=true;$('#fab').hidden=true;
 }

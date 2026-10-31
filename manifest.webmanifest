@@ -1,6 +1,6 @@
 {
- "name": "Custom Remaps – Job Planner",
- "short_name": "Job Planner",
+ "name": "Custom Remaps",
+ "short_name": "Custom Remaps",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",
