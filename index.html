@@ -173,6 +173,13 @@ select.small{font-size:13px;padding:7px 10px;border-radius:10px;border:1px solid
 .linkbtn{background:transparent;border:1px solid var(--head-line);color:var(--head-ink);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600}
 .linkbtn.plain{border-color:transparent;color:var(--head-soft);padding-left:2px;display:flex;align-items:center;gap:4px}
 .dhead h2{margin:0;font-family:var(--display);font-weight:700;font-size:26px;line-height:1.1;overflow-wrap:anywhere}
+.mapbox{height:320px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--seg);position:relative;z-index:0}
+.mk{width:30px;height:30px;border-radius:50%;color:#FFFFFF;font-family:var(--display);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #FFFFFF;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.mk.nx{background:#FFFFFF!important;border:2px dashed var(--mk);color:var(--mk)}
+.mrow{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;color:var(--ink);font-size:14px}
+.mrow b{font-size:15px;display:flex;align-items:center;gap:8px}
+.mrow .dot{width:12px;height:12px;border-radius:50%;flex:none}
+.mrow span.l{color:var(--muted)}
 .dveh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:var(--head-soft)}
 .dbody{padding-block:16px 4px;display:flex;flex-direction:column;gap:12px}
 .box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:9px}
@@ -558,6 +565,7 @@ const firstLine=s=>String(s||'').split('\n')[0];
 const SERVICES=['Stage 1 remap','Stage 2 remap','Economy remap','Gearbox remap','Dyno run','Diagnostics'];
 const STATUS={booked:'Booked',in_progress:'In progress',done:'Done',cancelled:'Cancelled'};
 const ICON={
+ map:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4L3 6.5v13L9 17l6 3 6-2.5v-13L15 7z"/><path d="M9 4v13M15 7v13"/></svg>',
  pin:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
  cal:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>',
  chat:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',
@@ -719,6 +727,7 @@ function render(){
   if(S.sheet==='detail')renderDetail();
   if(S.sheet==='clientview')renderClientView();
   if(S.sheet==='search')renderSearchResults();
+  if(S.sheet==='map')updateMap();
   ensureNames();
 }
 function weekStart(day){const d=parse(day);return addDays(day,-((d.getDay()+6)%7))}
@@ -739,7 +748,7 @@ function renderTop(){
   else if(S.tab==='clients'){title='Clients';eyebrow=S.clients.length+(S.clients.length===1?' saved client':' saved clients')}
   else if(S.tab==='money'){title='Money';eyebrow=longDay(today())}
   else{title='Team';eyebrow=S.techs.length+(S.techs.length===1?' technician':' technicians')}
-  const sbtn=S.tab==='schedule'?'<button class="hbtn" data-act="search" aria-label="Find a job">'+ICON.search+'</button>':'';
+  const sbtn=S.tab==='schedule'?(S.manager?'<button class="hbtn" data-act="map" aria-label="Map of technicians">'+ICON.map+'</button>':'')+'<button class="hbtn" data-act="search" aria-label="Find a job">'+ICON.search+'</button>':'';
   $('#top-inner').innerHTML='<img class="brand" src="assets/logo-app.png" alt="Custom Remaps UK"><div class="toprow"><div><div class="eyebrow">'+esc(eyebrow)+'</div><h1>'+esc(title)+'</h1></div><span class="tright">'+sbtn+role+'</span></div>'+extra;
 }
 function renderNav(){
@@ -908,7 +917,7 @@ function workloadHTML(){
 /* ---------- day rollover ---------- */
 function checkDay(){const t=today();if(S.lastToday!==t){if(S.day===S.lastToday)S.day=t;S.lastToday=t;if(S.ready)render()}}
 function openSheet(kind){S.sheet=kind;$('#sheet').hidden=false;document.body.style.overflow='hidden'}
-function closeSheet(){S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;$('#sheet').hidden=true;$('#panel').innerHTML='';document.body.style.overflow=''}
+function closeSheet(){if(S.leaf){try{S.leaf.remove()}catch(e){}S.leaf=null;S.leafLayer=null;S.mapKey=''}S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;$('#sheet').hidden=true;$('#panel').innerHTML='';document.body.style.overflow=''}
 function renderDetail(){
   const j=findJob(S.openKey);
   if(!j){closeSheet();return}
@@ -959,6 +968,104 @@ function renderDetail(){
   h+='</div>';
   const sc=$('#panel').scrollTop;$('#panel').innerHTML=h;$('#panel').scrollTop=sc;
 }
+
+/* ---------- technician map ---------- */
+/* Positions come from job postcodes (looked up on postcodes.io, free, no key). Only mobile jobs are shown: unit jobs are all at the workshop. */
+const PC_RE=/\b([A-Z]{1,2}\d[A-Z\d]?)\s*(\d[A-Z]{2})\b/i;
+const pcOf=a=>{const m=PC_RE.exec(String(a||''));return m?(m[1]+' '+m[2]).toUpperCase():''};
+const GEO_KEY='crGeo1';
+const geoMem=(()=>{try{const o=JSON.parse(localStorage.getItem(GEO_KEY)||'{}');return o&&typeof o==='object'?o:{}}catch(e){return {}}})();
+function geoSave(){try{localStorage.setItem(GEO_KEY,JSON.stringify(geoMem))}catch(e){}}
+let geoQ=Promise.resolve();
+function geocode(pcs){const r=geoQ.then(()=>geocodeNow(pcs));geoQ=r.catch(()=>{});return r}
+async function geocodeNow(pcs){
+  const need=[...new Set(pcs)].filter(x=>x&&!(x in geoMem));
+  for(let i=0;i<need.length;i+=100){
+    const chunk=need.slice(i,i+100);
+    const r=await fetch('https://api.postcodes.io/postcodes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({postcodes:chunk})});
+    if(!r.ok)throw new Error('geo');
+    const d=await r.json();
+    (d.result||[]).forEach((x,k)=>{const q=chunk[k];if(q)geoMem[q]=(x&&x.result&&typeof x.result.latitude==='number')?[x.result.latitude,x.result.longitude]:null});
+  }
+  if(need.length)geoSave();
+}
+function jobPlace(j){
+  const pc=pcOf(j.address);
+  return {pc:pc,ll:pc?geoMem[pc]||null:null};
+}
+function miles(a,b){const R=3958.8,r=x=>x*Math.PI/180,dl=r(b[0]-a[0]),dn=r(b[1]-a[1]);
+  const h=Math.sin(dl/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+const MAP_COLOURS=['#0E7C9B','#C2410C','#6D28D9','#15803D','#B91C1C','#A16207','#0369A1','#9D174D'];
+function mapPlan(day){
+  return S.techs.map((t,i)=>{
+    const js=S.jobs.filter(j=>j.date===day&&techIdOf(j)===t.id&&j.type==='mobile'&&j.status!=='cancelled').sort(byStart);   /* unit jobs are all at the workshop, so only mobile jobs go on the map */
+    const prog=js.filter(j=>j.status==='in_progress');const done=js.filter(j=>j.status==='done');
+    const here=prog.length?prog[prog.length-1]:(done.length?done[done.length-1]:null);
+    const next=js.find(j=>(j.status||'booked')==='booked'&&(!here||(j.start||'')>=(here.start||'')))||null;
+    return {tech:t,colour:MAP_COLOURS[i%MAP_COLOURS.length],here:here,next:next,count:js.length};
+  }).filter(p=>p.count>0);
+}
+let leafP=null;
+function loadLeaflet(){
+  if(window.L)return Promise.resolve();
+  if(leafP)return leafP;
+  leafP=new Promise((res,rej)=>{
+    const c=document.createElement('link');c.rel='stylesheet';c.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';document.head.appendChild(c);
+    const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    sc.onload=()=>res();sc.onerror=()=>{leafP=null;rej(new Error('leaflet'))};document.head.appendChild(sc);
+  });
+  return leafP;
+}
+function openMap(){
+  S.mapDay=today();S.mapKey='';S.mapTok=0;
+  openSheet('map');
+  $('#panel').innerHTML='<div class="dhead gut"><div class="bar"><button class="linkbtn plain" data-act="close">'+ICON.back+'Back</button></div>'+
+    '<div class="dveh"><span style="font-size:22px;font-weight:600;color:var(--head-ink)">Where everyone is</span></div></div>'+
+    '<div class="dbody gut"><div class="f"><label for="map-day">Day</label><input type="date" id="map-day" value="'+esc(S.mapDay)+'"></div>'+
+    '<div class="mapbox" id="mapbox" role="img" aria-label="Map of technician positions"></div><p class="note" id="map-msg" role="status" aria-live="polite"></p>'+
+    '<div id="maplist" style="display:flex;flex-direction:column;gap:8px"></div>'+
+    '<p class="note">A solid circle is where someone is now: the job in progress, or the last one finished. A dashed circle is their next job. Positions come from job postcodes and distances are in a straight line, so real driving distance is longer.</p></div>';
+  loadLeaflet().then(()=>{if(S.sheet==='map'){updateMap()}}).catch(()=>{const m=$('#map-msg');if(m)m.textContent='The map could not load. The list below still works.'});
+  updateMap();
+}
+async function updateMap(){
+  if(S.sheet!=='map'||!$('#maplist'))return;
+  const tok=++S.mapTok;const day=S.mapDay||today();const plan=mapPlan(day);
+  const pcs=[];plan.forEach(p=>[p.here,p.next].forEach(j=>{if(j){const pl=jobPlace(j);if(pl.pc)pcs.push(pl.pc)}}));
+  let geoErr=false;
+  try{await geocode(pcs)}catch(e){geoErr=true}
+  if(tok!==S.mapTok||S.sheet!=='map')return;
+  const msg=$('#map-msg');const pts=[];let missing=0;
+  const rows=plan.map(p=>{
+    const h=p.here?jobPlace(p.here):null,n=p.next?jobPlace(p.next):null;
+    const lines=[];
+    if(p.here){const where=h.pc||firstLine(p.here.address);lines.push('<span class="l">'+(p.here.status==='in_progress'?'Now: ':'Last job: ')+'</span>'+esc(p.here.customerName||'Job')+(where?' · '+esc(where):'')+(h.ll?'':' <span class="l">(not on the map)</span>'))}
+    else lines.push('<span class="l">Not started yet</span>');
+    if(p.next){const where=n.pc||firstLine(p.next.address);let d='';
+      if(h&&h.ll&&n.ll)d=' · about '+(miles(h.ll,n.ll)).toFixed(1)+' miles away';
+      lines.push('<span class="l">Next '+esc(p.next.start||'')+': </span>'+esc(p.next.customerName||'Job')+(where?' · '+esc(where):'')+d+(n.ll?'':' <span class="l">(not on the map)</span>'))}
+    else lines.push('<span class="l">No more jobs booked</span>');
+    [h,n].forEach(x=>{if(x&&!x.ll)missing++});
+    return '<button type="button" class="mrow" data-act="map-focus" data-v="'+esc(p.tech.id)+'"><b><span class="dot" style="background:'+p.colour+'"></span>'+esc(p.tech.name)+'</b>'+lines.map(l=>'<span>'+l+'</span>').join('')+'</button>';
+  });
+  $('#maplist').innerHTML=rows.length?rows.join(''):'<p class="note">No assigned jobs on this day.</p>';
+  if(msg)msg.textContent=geoErr?'Could not look up postcodes just now, so some pins are missing.':(missing?missing+(missing===1?' job has':' jobs have')+' no postcode, so '+(missing===1?'it is':'they are')+' not shown on the map.':'');
+  if(!window.L||!$('#mapbox'))return;
+  if(!S.leaf){S.leaf=L.map('mapbox',{zoomControl:true,attributionControl:true}).setView([54.5,-3],5);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(S.leaf);S.leafLayer=L.layerGroup().addTo(S.leaf);S.mapKey=''}
+  S.leafLayer.clearLayers();S.mapPts={};
+  plan.forEach(p=>{
+    const h=p.here?jobPlace(p.here):null,n=p.next?jobPlace(p.next):null;
+    const ic=(cls)=>L.divIcon({className:'',html:'<div class="mk '+cls+'" style="background:'+p.colour+';--mk:'+p.colour+'">'+esc(initials(p.tech.name))+'</div>',iconSize:[30,30],iconAnchor:[15,15]});
+    if(h&&h.ll){L.marker(h.ll,{icon:ic(''),title:p.tech.name+' (here)'}).addTo(S.leafLayer);pts.push(h.ll);S.mapPts[p.tech.id]=h.ll}
+    if(n&&n.ll){L.marker(n.ll,{icon:ic('nx'),title:p.tech.name+' (next job)'}).addTo(S.leafLayer);pts.push(n.ll);if(!S.mapPts[p.tech.id])S.mapPts[p.tech.id]=n.ll}
+    if(h&&h.ll&&n&&n.ll)L.polyline([h.ll,n.ll],{color:p.colour,weight:3,dashArray:'6 8',opacity:.8}).addTo(S.leafLayer);
+  });
+  const key=day+'|'+pts.map(x=>x.join(',')).join(';');
+  if(key!==S.mapKey){S.mapKey=key;S.leaf.invalidateSize();
+    if(pts.length===1)S.leaf.setView(pts[0],12);else if(pts.length>1)S.leaf.fitBounds(pts,{padding:[30,30],maxZoom:13})}
+}
+function mapFocus(id){if(S.leaf&&S.mapPts&&S.mapPts[id])S.leaf.setView(S.mapPts[id],13)}
 
 /* ---------- form ---------- */
 function renderForm(){
@@ -1542,6 +1649,8 @@ document.addEventListener('click',async ev=>{
   else if(a==='client-del-yes'){const c=S.clientEdit;if(!c)return;const ok=await write(()=>S.db.doc('board/main/clients/'+c.id).delete(),c.name+' deleted');if(ok)closeSheet()}
   else if(a==='pick-client'){const c=S.clients.find(x=>x.id===v);if(c)fillFromClient(c)}
   else if(a==='unpick-client'){const f=$('#jobform');if(!f)return;f.elements.clientId.value='';$('#f-lookup').innerHTML=lookupHTML(null);$('#saveclient-wrap').hidden=false;const s=$('#f-client');if(s){s.focus();showSugg('')}}
+  else if(a==='map'){if(S.manager)openMap()}
+  else if(a==='map-focus'){mapFocus(v)}
   else if(a==='search'){openSheet('search');renderSearch();const s=$('#sq-text');if(s)s.focus()}
   else if(a==='sq-reset'){S.sq=sqDefaults();renderSearch();const s=$('#sq-text');if(s)s.focus()}
   else if(a==='board-open'){location.hash='board';if(location.hash!=='#board')setBoard(true)}
@@ -1563,6 +1672,7 @@ document.addEventListener('click',async ev=>{
 document.addEventListener('change',ev=>{
   const t=ev.target;
   if(t.id==='worker-filter'){S.worker=t.value;render()}
+  if(t.id==='map-day'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.mapDay=t.value;S.mapKey='';updateMap()}
   if(t.id==='import-file'&&t.files&&t.files[0]){readImport(t.files[0]);t.value=''}
   if(t.id==='goto-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.day=t.value;render()}
   if(t.form&&t.form.id==='sqform')sqUpdate(t);
