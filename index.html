@@ -970,9 +970,7 @@ function renderDetail(){
 }
 
 /* ---------- technician map ---------- */
-/* Positions come from job postcodes (looked up on postcodes.io, free, no key). Unit jobs count as being at the workshop
-   when WORKSHOP_POSTCODE is set, for example 'SW1A 1AA'. */
-const WORKSHOP_POSTCODE='';
+/* Positions come from job postcodes (looked up on postcodes.io, free, no key). Only mobile jobs are shown: unit jobs are all at the workshop. */
 const PC_RE=/\b([A-Z]{1,2}\d[A-Z\d]?)\s*(\d[A-Z]{2})\b/i;
 const pcOf=a=>{const m=PC_RE.exec(String(a||''));return m?(m[1]+' '+m[2]).toUpperCase():''};
 const GEO_KEY='crGeo1';
@@ -992,15 +990,15 @@ async function geocodeNow(pcs){
   if(need.length)geoSave();
 }
 function jobPlace(j){
-  const pc=j.type==='mobile'?pcOf(j.address):pcOf(WORKSHOP_POSTCODE);
-  return {pc:pc,ll:pc?geoMem[pc]||null:null,unit:j.type!=='mobile'};
+  const pc=pcOf(j.address);
+  return {pc:pc,ll:pc?geoMem[pc]||null:null};
 }
 function miles(a,b){const R=3958.8,r=x=>x*Math.PI/180,dl=r(b[0]-a[0]),dn=r(b[1]-a[1]);
   const h=Math.sin(dl/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
 const MAP_COLOURS=['#0E7C9B','#C2410C','#6D28D9','#15803D','#B91C1C','#A16207','#0369A1','#9D174D'];
 function mapPlan(day){
   return S.techs.map((t,i)=>{
-    const js=S.jobs.filter(j=>j.date===day&&techIdOf(j)===t.id&&j.status!=='cancelled').sort(byStart);
+    const js=S.jobs.filter(j=>j.date===day&&techIdOf(j)===t.id&&j.type==='mobile'&&j.status!=='cancelled').sort(byStart);   /* unit jobs are all at the workshop, so only mobile jobs go on the map */
     const prog=js.filter(j=>j.status==='in_progress');const done=js.filter(j=>j.status==='done');
     const here=prog.length?prog[prog.length-1]:(done.length?done[done.length-1]:null);
     const next=js.find(j=>(j.status||'booked')==='booked'&&(!here||(j.start||'')>=(here.start||'')))||null;
@@ -1041,9 +1039,9 @@ async function updateMap(){
   const rows=plan.map(p=>{
     const h=p.here?jobPlace(p.here):null,n=p.next?jobPlace(p.next):null;
     const lines=[];
-    if(p.here){const where=h.pc||firstLine(p.here.address)||(h.unit?'Workshop':'');lines.push('<span class="l">'+(p.here.status==='in_progress'?'Now: ':'Last job: ')+'</span>'+esc(p.here.customerName||'Job')+(where?' · '+esc(where):'')+(h.ll?'':' <span class="l">(not on the map)</span>'))}
+    if(p.here){const where=h.pc||firstLine(p.here.address);lines.push('<span class="l">'+(p.here.status==='in_progress'?'Now: ':'Last job: ')+'</span>'+esc(p.here.customerName||'Job')+(where?' · '+esc(where):'')+(h.ll?'':' <span class="l">(not on the map)</span>'))}
     else lines.push('<span class="l">Not started yet</span>');
-    if(p.next){const where=n.pc||firstLine(p.next.address)||(n.unit?'Workshop':'');let d='';
+    if(p.next){const where=n.pc||firstLine(p.next.address);let d='';
       if(h&&h.ll&&n.ll)d=' · about '+(miles(h.ll,n.ll)).toFixed(1)+' miles away';
       lines.push('<span class="l">Next '+esc(p.next.start||'')+': </span>'+esc(p.next.customerName||'Job')+(where?' · '+esc(where):'')+d+(n.ll?'':' <span class="l">(not on the map)</span>'))}
     else lines.push('<span class="l">No more jobs booked</span>');
