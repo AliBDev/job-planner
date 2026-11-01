@@ -214,6 +214,8 @@ legend{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:
 .f input.mono{font-family:var(--mono)}
 .f input.regin{font-family:var(--display);font-weight:700;letter-spacing:.08em;background:var(--plate);color:var(--plate-ink);border-color:var(--plate-edge);text-transform:uppercase}
 .regrow{display:grid;grid-template-columns:minmax(0,130px) minmax(0,1fr);gap:10px}
+.reglook{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.reglook .note{margin:0;flex:1;min-width:0;overflow-wrap:anywhere}
 .presets{display:flex;flex-wrap:wrap;gap:6px}
 .preset{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600}
 .preset.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -468,6 +470,8 @@ const FIREBASE_CONFIG={
 };
 /* Manager accounts: full access. Must match the list in the Firestore security rules. */
 const MANAGER_EMAILS=['abhatti89@gmail.com'];
+/* Reg lookup: address of the Cloudflare Worker in /worker (see worker/README.md). Leave empty to hide the Look up button. */
+const DVLA_LOOKUP_URL='';
 const EMAIL_RE=/^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const APP_URL=location.origin+location.pathname;
 
@@ -519,6 +523,7 @@ function makeUser(u){
 const FB={
   db:DB,makeUser:makeUser,
   onAuth:cb=>onAuthStateChanged(auth,cb),
+  idToken:async()=>auth.currentUser?auth.currentUser.getIdToken():'',
   google:async()=>{const pr=new GoogleAuthProvider();pr.setCustomParameters({prompt:'select_account'});
     try{return await signInWithPopup(auth,pr)}
     catch(e){if(e&&(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment'))return signInWithRedirect(auth,pr);throw e}},
@@ -982,7 +987,7 @@ function renderForm(){
   h+='<div class="banner" id="f-clash" role="status" hidden></div>';
   h+='<fieldset><legend>Customer and vehicle</legend><input type="hidden" name="clientId" id="f-clientId" value="'+esc(linkedC?linkedC.id:'')+'"><div id="f-lookup">'+lookupHTML(linkedC)+'</div><div class="f"><label for="f-customerName">Customer name</label><input id="f-customerName" name="customerName" value="'+esc(j.customerName||'')+'" autocomplete="off" required></div>'+
      '<div class="f"><label for="f-phone">Phone</label><input id="f-phone" name="phone" type="tel" class="mono" value="'+esc(j.phone||'')+'" autocomplete="off"></div>'+
-     '<div class="regrow"><div class="f"><label for="f-reg">Reg</label><input id="f-reg" name="reg" class="regin" value="'+esc(j.reg||'')+'" autocomplete="off" autocapitalize="characters"></div><div class="f"><label for="f-vehicle">Make and model</label><input id="f-vehicle" name="vehicle" value="'+esc(j.vehicle||'')+'" autocomplete="off"></div></div>'+
+     '<div class="regrow"><div class="f"><label for="f-reg">Reg</label><input id="f-reg" name="reg" class="regin" value="'+esc(j.reg||'')+'" autocomplete="off" autocapitalize="characters"></div><div class="f"><label for="f-vehicle">Make and model</label><input id="f-vehicle" name="vehicle" value="'+esc(j.vehicle||'')+'" autocomplete="off"></div></div>'+(DVLA_LOOKUP_URL?'<div class="reglook"><button type="button" class="btn soft sm" id="reglook" data-act="reg-lookup">Look up reg</button><p class="note" id="reg-msg" role="status" aria-live="polite"></p></div>':'')+
      '<label class="check" for="f-saveclient" id="saveclient-wrap"'+(linkedC||!S.manager?' hidden':'')+'><input type="checkbox" id="f-saveclient" name="saveClient">Save to my client list</label></fieldset>';
   h+='<fieldset><legend>The job</legend><div class="presets">'+SERVICES.map(s=>'<button type="button" class="preset'+(j.service===s?' on':'')+'" data-act="preset" data-v="'+esc(s)+'">'+esc(s)+'</button>').join('')+'</div>'+
      '<div class="f"><label for="f-service">Service</label><input id="f-service" name="service" value="'+esc(j.service||'')+'" placeholder="Pick above or type your own"></div>'+
@@ -1013,6 +1018,26 @@ function fillFromClient(c){
   if(c.notes&&!E.notes.value)E.notes.value=c.notes;
   if(c.type){const r=document.getElementById('f-type-'+c.type);if(r){r.checked=true;applyType(c.type==='mobile')}}
   E.clientId.value=c.id;$('#f-lookup').innerHTML=lookupHTML(c);$('#saveclient-wrap').hidden=true;E.saveClient.checked=false;updateLeft();updateClash();
+}
+const titleCase=t=>String(t||'').toLowerCase().replace(/(^|[\s-])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
+async function regLookup(){
+  const f=$('#jobform');const msg=$('#reg-msg');const btn=$('#reglook');if(!f||!msg||!DVLA_LOOKUP_URL)return;
+  const reg=f.elements.reg.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(reg.length<2){msg.textContent='Type the reg first.';return}
+  btn.disabled=true;msg.textContent='Looking up '+reg+'...';
+  try{
+    const tok=await FB.idToken();
+    const r=await fetch(DVLA_LOOKUP_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({reg:reg})});
+    const d=await r.json().catch(()=>({}));
+    if(!$('#reg-msg'))return;   /* form was closed while waiting */
+    if(!r.ok){msg.textContent=r.status===404?'DVLA has no vehicle with that reg.':r.status===400?'That does not look like a valid reg.':r.status===429?'DVLA is busy, try again in a minute.':r.status===401?'Sign in again, then retry.':'Lookup failed. Fill it in by hand.';return}
+    const make=titleCase(d.make);const v=f.elements.vehicle;
+    const bits=[make,titleCase(d.colour),d.year,titleCase(d.fuel),d.cc?d.cc+'cc':''].filter(Boolean).join(', ');
+    const mot=d.motExpiry?' MOT to '+d.motExpiry+'.':(d.motStatus?' MOT: '+d.motStatus+'.':'');
+    if(!v.value.trim()&&make){v.value=make+' ';v.focus();v.setSelectionRange(v.value.length,v.value.length);msg.textContent=bits+'.'+mot+' Add the model.'}
+    else msg.textContent=bits+'.'+mot;
+  }catch(e){if($('#reg-msg'))msg.textContent='Could not reach the lookup. Fill it in by hand.'}
+  finally{const b=$('#reglook');if(b)b.disabled=false}
 }
 function updateLeft(){const f=$('#jobform');if(!f)return;const l=Math.max(0,num(f.elements.price.value)-num(f.elements.deposit.value));$('#f-left').textContent=f.elements.paid.value==='yes'?'Paid':money2(l)}
 async function submitForm(f){
@@ -1511,6 +1536,7 @@ document.addEventListener('click',async ev=>{
   else if(a==='backup'){downloadBackup()}
   else if(a==='import-no'){S.importData=null;render()}
   else if(a==='import-yes'){await runImport()}
+  else if(a==='reg-lookup'){await regLookup()}
   else if(a==='cancel-ask'){S.confirmCancel=true;renderDetail()}
   else if(a==='cancel-no'){S.confirmCancel=false;renderDetail()}
   else if(a==='copymsg'){const j=findJob(S.openKey);if(!j)return;try{await navigator.clipboard.writeText(reminderText(j));toast('Message copied. Paste it into a text or WhatsApp.')}catch(e){toast('Copy failed. Use the Text or WhatsApp button instead.')}}
