@@ -294,6 +294,25 @@ legend{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:
 .srsum span{font-family:var(--mono)}
 .srsum .owe{color:var(--bad)}
 .p-clash{background:var(--bad-soft);color:var(--bad)}
+.plate.tap{cursor:pointer;appearance:none;-webkit-appearance:none}
+.plate.tap:hover{filter:brightness(.96)}
+.pill.p-steps{background:var(--neutral-soft);color:var(--neutral)}
+.pill.p-steps.full{background:var(--ok-soft);color:var(--ok)}
+.chkrow{display:flex;align-items:center;gap:4px}
+.chk{flex:1;min-width:0;display:flex;align-items:center;gap:12px;min-height:44px;padding:6px 4px;border:0;border-radius:10px;background:transparent;color:var(--ink);text-align:left;font-size:15px}
+.chk .bx{width:26px;height:26px;border-radius:8px;border:2px solid var(--line-2);flex:none;display:flex;align-items:center;justify-content:center;color:#FFFFFF}
+.chk .bx svg{opacity:0}
+.chk.on .bx{background:var(--ok);border-color:var(--ok)}
+.chk.on .bx svg{opacity:1}
+.chk.on .tx{color:var(--muted);text-decoration:line-through}
+.chk .tx{overflow-wrap:anywhere}
+.chk[disabled]{cursor:default}
+.chkrm{width:40px;height:40px;flex:none;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:20px;line-height:1}
+.addstep{display:flex;gap:8px;align-items:center}
+.addstep input{flex:1;min-width:0;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink)}
+.chkhead{display:flex;justify-content:space-between;align-items:baseline}
+.lnk{color:var(--accent);overflow-wrap:anywhere}
+.b-steps{color:var(--b-mute);font-size:clamp(12px,1vw,24px)}
 .weekbar .mo{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .datepick{background:transparent;border:1px solid var(--head-line);color:var(--head-soft);border-radius:999px;height:32px;padding:0 10px;font-size:13px;font-weight:600;color-scheme:dark;max-width:140px;min-width:0}
 .wkgrid td,.wkgrid th{text-align:center}
@@ -718,6 +737,7 @@ function render(){
   $('#fab').hidden=!(S.tab==='schedule'&&(S.manager||!S.readOnly));
   if(S.sheet==='detail')renderDetail();
   if(S.sheet==='clientview')renderClientView();
+  if(S.sheet==='reghist')renderRegHistory();
   if(S.sheet==='search')renderSearchResults();
   ensureNames();
 }
@@ -750,6 +770,38 @@ function renderNav(){
 }
 const byStart=(a,b)=>(a.date+a.start).localeCompare(b.date+b.start);
 function jobBal(j){return Math.max(0,(Number(j.price)||0)-(Number(j.deposit)||0))}
+
+/* ---------- checklist ---------- */
+const REMAP_STEPS=['Back up original file','Write the map','Road test'];
+const isRemap=sv=>/remap/i.test(String(sv||''));
+const defaultSteps=sv=>isRemap(sv)?REMAP_STEPS.map(t=>({t:t,d:false})):[];
+const steps=j=>Array.isArray(j.checklist)?j.checklist.filter(x=>x&&typeof x.t==='string'):[];
+const stepsDone=j=>steps(j).filter(x=>x.d).length;
+function stepsPill(j){const a=steps(j);if(!a.length||j.status==='cancelled')return '';const n=stepsDone(j);return '<span class="pill p-steps'+(n===a.length?' full':'')+'">'+n+'/'+a.length+' steps</span>'}
+function stepsTV(j){const a=steps(j);return a.length?'<span class="b-steps">'+stepsDone(j)+'/'+a.length+' steps</span>':''}
+const CHK_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function checklistHTML(j,canAct){
+  const a=steps(j);
+  if(!a.length&&!canAct)return '';
+  let h='<div class="box"><div class="chkhead"><span class="lab">Checklist</span>'+(a.length?'<span class="note">'+stepsDone(j)+' of '+a.length+' done</span>':'')+'</div>';
+  if(a.length)h+='<div class="checks">'+a.map((x,i)=>'<div class="chkrow"><button type="button" class="chk'+(x.d?' on':'')+'" '+(canAct?'data-act="step" data-v="'+i+'"':'disabled')+' aria-pressed="'+(!!x.d)+'"><span class="bx">'+CHK_SVG+'</span><span class="tx">'+esc(x.t)+'</span></button>'+(canAct?'<button type="button" class="chkrm" data-act="step-rm" data-v="'+i+'" aria-label="Remove step: '+esc(x.t)+'">×</button>':'')+'</div>').join('')+'</div>';
+  else h+='<p class="note">No steps on this job yet.</p>';
+  if(canAct){
+    if(!a.length&&isRemap(j.service))h+='<button type="button" class="btn soft" style="align-self:flex-start" data-act="step-defaults">Add the standard remap steps</button>';
+    h+='<form id="stepform" class="addstep" novalidate><label for="step-input" class="sr">Add a step</label><input id="step-input" maxlength="80" autocomplete="off" placeholder="Add a step"><button class="btn soft sm" type="submit">Add</button></form>';
+  }
+  return h+'</div>';
+}
+async function saveSteps(j,arr,ok){return write(()=>jobsCol(j.wid).doc(j.id).update({checklist:arr,updatedAt:Date.now()}),ok)}
+async function addStep(){
+  const j=findJob(S.openKey);const i=$('#step-input');if(!j||!i)return;const t=i.value.trim().slice(0,80);if(!t)return;
+  i.value='';await saveSteps(j,steps(j).concat([{t:t,d:false}]));const n=$('#step-input');if(n)n.focus();
+}
+
+/* ---------- reg history ---------- */
+const normReg=r=>String(r||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+function regJobs(reg){const k=normReg(reg);return k?S.jobs.filter(j=>normReg(j.reg)===k).sort(byStart).reverse():[]}
+
 function payPill(j){if(j.status==='cancelled')return '';return j.paid?'<span class="pill p-paid">Paid</span>':'<span class="pill p-unpaid">Unpaid</span>'}
 function statusPill(j){const s=j.status||'booked';let t=STATUS[s]||'Booked';return '<span class="pill p-'+esc(s)+'">'+esc(t)+'</span>'}
 function typePill(j){return j.type==='mobile'?'<span class="pill p-mobile">Mobile</span>':'<span class="pill p-unit">Unit</span>'}
@@ -762,7 +814,7 @@ function card(j,opt){
     '<span class="tcol"><span class="t">'+esc(j.start||'--:--')+'</span><span class="d">'+esc(fmtDur(j.duration))+'</span></span>'+
     '<span class="jbody"><span class="r1"><span class="cust">'+esc(j.customerName||'No customer name')+'</span>'+(opt.price===false?'':'<span class="price">'+money(j.price)+'</span>')+'</span>'+
     ((j.reg||j.vehicle)?'<span class="veh">'+(j.reg?'<span class="plate">'+esc(j.reg)+'</span>':'')+'<span>'+esc(j.vehicle||'')+'</span></span>':'')+loc+
-    '<span class="tags">'+typePill(j)+statusPill(j)+payPill(j)+clashPill(j,key)+who+'</span></span></button>';
+    '<span class="tags">'+typePill(j)+statusPill(j)+payPill(j)+stepsPill(j)+clashPill(j,key)+who+'</span></span></button>';
 }
 function renderSchedule(){
   const all=S.jobs.filter(j=>j.date===S.day&&(S.worker==='all'||techIdOf(j)===S.worker));
@@ -800,7 +852,7 @@ function renderMine(){
         '<div class="tt"><b>'+esc(next.start)+'</b><span class="note">'+esc(fmtDur(next.duration))+' · '+(next.type==='mobile'?'Mobile':'Unit')+'</span></div>'+
         (next.type==='mobile'&&next.address?'<div class="pre" style="font-size:15px">'+esc(next.address)+'</div>':'')+
         ((next.reg||next.vehicle)?'<div class="veh">'+(next.reg?'<span class="plate">'+esc(next.reg)+'</span>':'')+'<span>'+esc(next.vehicle||'')+'</span></div>':'')+
-        '<div style="font-size:14px;color:var(--ink-2)"><b style="font-weight:600">'+esc(next.service||'Job')+'.</b> '+esc(next.description||'')+'</div>'+
+        '<div style="font-size:14px;color:var(--ink-2)"><b style="font-weight:600">'+esc(next.service||'Job')+'.</b> '+esc(next.description||'')+'</div>'+(steps(next).length?'<div>'+stepsPill(next)+'</div>':'')+
         (next.paid?'<div class="collect"><span>Paid in full</span><b>'+money(next.price)+'</b></div>':'<div class="collect"><span>To collect from '+esc(next.customerName||'customer')+'</span><b>'+money(bal)+'</b></div>')+
         '<div class="two">'+(next.address?'<a class="btn soft" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(next.address.replace(/\n/g,', '))+'">'+ICON.nav+'Directions</a>':'<button class="btn soft" data-act="open" data-v="'+esc(next.wid+'/'+next.id)+'">Details</button>')+
         (next.status==='in_progress'?'<button class="btn orange" data-act="quick" data-v="'+esc(next.wid+'/'+next.id)+'" data-s="done">Mark done</button>':'<button class="btn orange" data-act="quick" data-v="'+esc(next.wid+'/'+next.id)+'" data-s="in_progress">Start job</button>')+'</div>'+
@@ -908,7 +960,7 @@ function workloadHTML(){
 /* ---------- day rollover ---------- */
 function checkDay(){const t=today();if(S.lastToday!==t){if(S.day===S.lastToday)S.day=t;S.lastToday=t;if(S.ready)render()}}
 function openSheet(kind){S.sheet=kind;$('#sheet').hidden=false;document.body.style.overflow='hidden'}
-function closeSheet(){S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;$('#sheet').hidden=true;$('#panel').innerHTML='';document.body.style.overflow=''}
+function closeSheet(){S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;S.viewReg=null;S.regFrom=null;S.returnReg=null;S.confirmDone=false;$('#sheet').hidden=true;$('#panel').innerHTML='';document.body.style.overflow=''}
 function renderDetail(){
   const j=findJob(S.openKey);
   if(!j){closeSheet();return}
@@ -918,7 +970,7 @@ function renderDetail(){
   let h='<div class="dhead gut"><div class="bar"><button class="linkbtn plain" data-act="close">'+ICON.back+esc(shortDay(j.date))+'</button>'+(canAct?'<button class="linkbtn" data-act="edit">Edit</button>':'')+'</div>'+
     '<div class="tags">'+typePill(j)+statusPill(j)+payPill(j)+'</div>'+
     '<h2>'+esc(j.customerName||'No customer name')+'</h2>'+
-    ((j.reg||j.vehicle)?'<div class="dveh">'+(j.reg?'<span class="plate lg">'+esc(j.reg)+'</span>':'')+'<span>'+esc(j.vehicle||'')+'</span></div>':'')+'</div>';
+    ((j.reg||j.vehicle)?'<div class="dveh">'+(j.reg?(S.manager?'<button type="button" class="plate lg tap" data-act="reg-history" data-v="'+esc(j.reg)+'" aria-label="See every job for '+esc(j.reg)+'">'+esc(j.reg)+' ›</button>':'<span class="plate lg">'+esc(j.reg)+'</span>'):'')+'<span>'+esc(j.vehicle||'')+'</span></div>':'')+'</div>';
   h+='<div class="dbody gut">';
   {const cl=st==='cancelled'?[]:clashesFor(Object.assign({},j,{techId:techIdOf(j)}),S.openKey);if(cl.length)h+='<div class="banner"><b>Time clash.</b> Overlaps with '+clashList(cl)+'.</div>'}
   h+='<div class="box"><div class="grid2"><div class="kv"><span class="lab">When</span><b>'+esc(shortDay(j.date))+'</b><span class="m">'+esc(j.start)+' – '+esc(endTime(j.start,j.duration))+'</span></div>'+
@@ -938,12 +990,15 @@ function renderDetail(){
       '<button class="btn ghost" data-act="copymsg">Copy message</button></div></div>';
   }
   h+='<div class="box"><span class="lab">The job</span><b style="font-size:16px">'+esc(j.service||'Not specified')+'</b>'+(j.description?'<p class="pre">'+esc(j.description)+'</p>':'')+'</div>';
+  h+=checklistHTML(j,canAct);
   h+='<div class="box"><span class="lab">Payment</span><div class="ln"><span>Price</span><span class="v">'+money2(j.price)+'</span></div>'+
      (Number(j.deposit)?'<div class="ln" style="color:var(--ok)"><span>Deposit paid</span><span class="v">−'+money2(j.deposit)+'</span></div>':'')+
      '<div class="hr"></div><div class="ln" style="font-weight:600;font-size:16px"><span>'+(j.paid?'Paid in full':'Left to collect')+'</span><span class="v">'+(j.paid?'✓':money2(bal))+'</span></div>'+
      (canAct?'<div class="seg" role="group" aria-label="Payment"><button class="'+(j.paid?'':'on unp-on')+'" data-act="setpaid" data-v="0" aria-pressed="'+(!j.paid)+'">Unpaid</button><button class="'+(j.paid?'on pd-on':'')+'" data-act="setpaid" data-v="1" aria-pressed="'+(!!j.paid)+'">Paid</button></div>':'')+'</div>';
   if(j.notes)h+='<div class="box"><span class="lab">Notes</span><p class="pre">'+esc(j.notes)+'</p></div>';
+  if(j.fileNote)h+='<div class="box"><span class="lab">Files and links</span><p class="pre">'+esc(j.fileNote).replace(/https?:\/\/[^\s<]+/g,u=>'<a class="lnk" href="'+u+'" target="_blank" rel="noopener noreferrer">'+u+'</a>')+'</p></div>';
   if(canAct){
+    if(S.confirmDone){const left=steps(j).length-stepsDone(j);h+='<div class="confirm"><p>'+left+(left===1?' step is':' steps are')+' not ticked yet. Mark the job done anyway?</p><div class="two"><button class="btn ghost" data-act="done-no">Go back</button><button class="btn pri" data-act="status" data-v="done" data-force="1">Mark done</button></div></div>'}
     h+='<div style="display:flex;flex-direction:column;gap:8px"><span class="lab" style="padding:0 2px">Status</span><div class="seg" role="group" aria-label="Job status">'+
       ['booked','in_progress','done'].map(s=>'<button class="'+(st===s?'on':'')+'" data-act="status" data-v="'+s+'" aria-pressed="'+(st===s)+'">'+STATUS[s]+'</button>').join('')+'</div></div>';
   }
@@ -955,6 +1010,34 @@ function renderDetail(){
     else h+='<button class="btn danger" data-act="cancel-ask">Cancel job</button>';
     if(S.confirmDel)h+='<div class="confirm"><p>Delete this job for good? This can\'t be undone.</p><div class="two"><button class="btn ghost" data-act="del-no">Keep it</button><button class="btn danger solid" data-act="del-yes">Delete</button></div></div>';
     else h+='<button class="btn danger" data-act="del">Delete job</button>';
+  }
+  h+='</div>';
+  const si=$('#step-input');const sv=si?si.value:'';const sf=!!si&&document.activeElement===si;
+  const sc=$('#panel').scrollTop;$('#panel').innerHTML=h;$('#panel').scrollTop=sc;
+  {const n=$('#step-input');if(n){if(sv)n.value=sv;if(sf)n.focus()}}
+}
+
+/* ---------- reg history sheet ---------- */
+function renderRegHistory(){
+  const reg=S.viewReg;const list=regJobs(reg);
+  const live=list.filter(j=>j.status!=='cancelled');
+  const billed=live.reduce((a,j)=>a+(Number(j.price)||0),0);
+  const owed=live.filter(j=>!j.paid).reduce((a,j)=>a+jobBal(j),0);
+  const shown=(list[0]&&list[0].reg)||reg;
+  const veh=[...new Set(list.map(j=>String(j.vehicle||'').trim()).filter(Boolean))];
+  const cust=[...new Set(list.map(j=>String(j.customerName||'').trim()).filter(Boolean))];
+  let h='<div class="dhead gut"><div class="bar"><button class="linkbtn plain" data-act="close">'+ICON.back+'Back</button></div>'+
+    '<div class="tags"><span class="pill p-booked">Vehicle history</span></div>'+
+    '<div class="dveh"><span class="plate lg">'+esc(shown)+'</span><span>'+esc(veh.join(' · '))+'</span></div></div>';
+  h+='<div class="dbody gut">';
+  if(!list.length)h+='<p class="note">No jobs found for this reg.</p>';
+  else{
+    h+='<div class="stats"><div class="stat"><span>Jobs</span><b>'+live.length+'</b></div><div class="stat"><span>Billed</span><b>'+money(billed)+'</b></div><div class="stat"><span>Outstanding</span><b style="color:'+(owed?'var(--bad)':'var(--ok)')+'">'+money(owed)+'</b></div></div>';
+    if(cust.length)h+='<div class="box"><span class="lab">'+(cust.length>1?'Customers on this car':'Customer')+'</span><p class="pre" style="color:var(--ink)">'+cust.map(esc).join('\n')+'</p></div>';
+    h+='<div class="sec"><h2>Every job</h2></div><div class="list">'+list.map(j=>{const tn=jobTechName(j);
+      return '<button class="crow'+(j.status==='cancelled'?' cancelled':'')+'" data-act="open" data-v="'+esc(j.wid+'/'+j.id)+'"><span class="nm"><b style="font-size:15px">'+esc(shortDay(j.date))+' '+esc(String(j.date||'').slice(0,4))+' · '+esc(j.start||'')+'</b>'+
+        '<span>'+esc([j.service||'Job',j.customerName,tn,STATUS[j.status||'booked']].filter(Boolean).join(' · '))+'</span>'+(steps(j).length?'<span>'+stepsDone(j)+' of '+steps(j).length+' steps done</span>':'')+'</span>'+
+        '<span class="cr-r"><span class="price">'+money(j.price)+'</span>'+payPill(j)+'</span></button>'}).join('')+'</div>';
   }
   h+='</div>';
   const sc=$('#panel').scrollTop;$('#panel').innerHTML=h;$('#panel').scrollTop=sc;
@@ -989,7 +1072,8 @@ function renderForm(){
      '<div class="f"><label for="f-description">Description</label><textarea id="f-description" name="description" rows="3">'+esc(j.description||'')+'</textarea></div></fieldset>';
   h+='<fieldset><legend>Price</legend><div class="grid2"><div class="f"><label for="f-price">Job price (£)</label><input id="f-price" name="price" class="mono" inputmode="decimal" value="'+(j.price!=null&&j.price!==''?esc(j.price):'')+'"></div><div class="f"><label for="f-deposit">Deposit paid (£)</label><input id="f-deposit" name="deposit" class="mono" inputmode="decimal" value="'+(j.deposit?esc(j.deposit):'')+'"></div></div>'+
      '<div class="left"><span>Left to collect</span><b id="f-left">£0.00</b></div><div class="f"><span class="lab" id="paid-lab">Payment</span><div class="seg" role="radiogroup" aria-labelledby="paid-lab"><label class="unp"><input type="radio" name="paid" id="f-paid-no" value="no"'+(j.paid?'':' checked')+'><span>Unpaid</span></label><label class="pd"><input type="radio" name="paid" id="f-paid-yes" value="yes"'+(j.paid?' checked':'')+'><span>Paid</span></label></div></div></fieldset>';
-  h+='<fieldset><legend>Notes</legend><div class="f"><label for="f-notes">Notes for the technician</label><textarea id="f-notes" name="notes" rows="2" placeholder="Garage contact, parking, anything to bring">'+esc(j.notes||'')+'</textarea></div></fieldset>';
+  h+='<fieldset><legend>Notes</legend><div class="f"><label for="f-notes">Notes for the technician</label><textarea id="f-notes" name="notes" rows="2" placeholder="Garage contact, parking, anything to bring">'+esc(j.notes||'')+'</textarea></div>'+
+     '<div class="f"><label for="f-fileNote">Files and links (optional)</label><textarea id="f-fileNote" name="fileNote" rows="2" placeholder="Where the original ECU file is stored, or paste a link">'+esc(j.fileNote||'')+'</textarea></div></fieldset>';
   h+='<button type="submit" class="btn pri block" id="f-submit">'+(isNew?'Save job':'Save changes')+'</button></form>';
   $('#panel').innerHTML=h;$('#panel').scrollTop=0;updateLeft();updateClash();
 }
@@ -1021,7 +1105,7 @@ async function submitForm(f){
   const techId=v('assignee');const tech=techById(techId);const wid=S.manager?((tech&&tech.uid)||''):S.me;
   const data={type:f.elements.type.value==='mobile'?'mobile':'unit',date:v('date'),start:v('start'),duration:Number(v('duration'))||60,
     bay:v('bay'),address:v('address'),customerName:v('customerName'),phone:v('phone'),reg:v('reg').toUpperCase(),vehicle:v('vehicle'),
-    service:v('service'),description:v('description'),price:num(v('price')),deposit:num(v('deposit')),paid:f.elements.paid.value==='yes',notes:v('notes'),
+    service:v('service'),description:v('description'),price:num(v('price')),deposit:num(v('deposit')),paid:f.elements.paid.value==='yes',notes:v('notes'),fileNote:v('fileNote'),checklist:old?(Array.isArray(old.checklist)?old.checklist:undefined):defaultSteps(v('service')),
     clientId:v('clientId'),assignee:wid,techId:tech?tech.id:'',techName:tech?tech.name:'',status:old?(old.status||'booked'):'booked',createdAt:old&&old.createdAt?old.createdAt:Date.now(),updatedAt:Date.now()};
   if(data.type==='mobile')data.bay='';
   if(!data.customerName||!data.date||!data.start){toast('Add a customer name, date and start time.');return}
@@ -1417,12 +1501,12 @@ function renderBoard(){
     const tn=jobTechName(j);const f=fresh(j);
     const desc=priv?'':[j.description,j.notes].filter(Boolean).join(' · ');
     if(cx)return '<article class="b-card b-c'+(f?' b-new':'')+'"><div class="b-row1"><span class="b-time">'+esc(j.start||'--:--')+'</span>'+(j.reg?'<span class="b-plate">'+esc(j.reg)+'</span>':'')+'<span class="b-model">'+esc(j.service||'Job')+'</span><span class="b-r">'+(f?'<span class="b-tag">'+f.kind+'</span>':'')+'</span></div>'+
-      '<div class="b-foot">'+(tn?'<span class="b-who">'+jobAv(j,'md')+esc(tn)+'</span>':'<span class="b-need">Needs a technician</span>')+'<span class="b-dur">'+esc(fmtDur(j.duration))+'</span>'+flag+'</div></article>';
+      '<div class="b-foot">'+(tn?'<span class="b-who">'+jobAv(j,'md')+esc(tn)+'</span>':'<span class="b-need">Needs a technician</span>')+'<span class="b-dur">'+esc(fmtDur(j.duration))+'</span>'+stepsTV(j)+flag+'</div></article>';
     return '<article class="b-card'+(f?' b-new':'')+'"><div class="b-row1"><span class="b-time">'+esc(j.start||'--:--')+'</span>'+(j.reg?'<span class="b-plate">'+esc(j.reg)+'</span>':'')+(j.vehicle?'<span class="b-model">'+esc(j.vehicle)+'</span>':'')+
       '<span class="b-r">'+(f?'<span class="b-tag">'+f.kind+'</span>':'')+'</span></div>'+
       '<div class="b-svc">'+esc(j.service||'Job')+'<span class="b-cust"> · '+esc(fmtDur(j.duration))+(!priv&&j.customerName?' · '+esc(j.customerName):'')+'</span></div>'+
       (kind!=='done'&&desc?'<div class="b-desc">'+esc(desc)+'</div>':'')+
-      '<div class="b-foot">'+(tn?'<span class="b-who">'+jobAv(j,'md')+esc(tn)+'</span>':'<span class="b-need">Needs a technician</span>')+flag+'</div></article>'};
+      '<div class="b-foot">'+(tn?'<span class="b-who">'+jobAv(j,'md')+esc(tn)+'</span>':'<span class="b-need">Needs a technician</span>')+stepsTV(j)+flag+'</div></article>'};
   const col=(title,list,kind,empty,max)=>{
     const shown=max&&list.length>max?list.slice(-max):list;const more=list.length-shown.length;
     return '<section class="b-col '+kind+(list.length>2?' dense':'')+(list.length>4?' xdense':'')+'" aria-label="'+esc(title)+'"><header class="b-colh"><h2>'+esc(title)+'</h2><span class="b-count">'+list.length+'</span></header><div class="b-list">'+
@@ -1486,10 +1570,12 @@ document.addEventListener('click',async ev=>{
   else if(a==='day'){S.day=v;render()}
   else if(a==='week'){S.day=addDays(S.day,Number(v));render()}
   else if(a==='type'){S.type=v;render()}
-  else if(a==='open'){if(!findJob(v)){toast('That job is no longer on your list.');return}const rc=(S.sheet==='clientview')?S.viewClient:null;const rs=S.sheet==='search'||(S.sheet==='detail'&&S.returnSearch);S.viewClient=null;S.returnClient=rc;S.returnSearch=rs;S.openKey=v;S.confirmDel=false;S.confirmCancel=false;openSheet('detail');renderDetail();$('#panel').scrollTop=0}
+  else if(a==='open'){if(!findJob(v)){toast('That job is no longer on your list.');return}const rc=(S.sheet==='clientview')?S.viewClient:null;const rs=S.sheet==='search'||(S.sheet==='detail'&&S.returnSearch);const rg=(S.sheet==='reghist')?S.viewReg:null;S.viewClient=null;S.returnClient=rc;S.returnSearch=rs;S.returnReg=rg;S.openKey=v;S.confirmDel=false;S.confirmCancel=false;S.confirmDone=false;openSheet('detail');renderDetail();$('#panel').scrollTop=0}
   else if(a==='close'){
     if(S.sheet==='detail'&&S.returnSearch){closeSheet();openSheet('search');renderSearch();return}
     if(S.sheet==='detail'&&S.returnClient){const id=S.returnClient;closeSheet();S.viewClient=id;openSheet('clientview');renderClientView();return}
+    if(S.sheet==='detail'&&S.returnReg){const r=S.returnReg;S.returnReg=null;S.viewReg=r;S.openKey=null;S.confirmDone=false;S.sheet='reghist';renderRegHistory();$('#panel').scrollTop=0;return}
+    if(S.sheet==='reghist'&&S.regFrom){const k=S.regFrom;S.regFrom=null;S.viewReg=null;S.openKey=k;S.sheet='detail';renderDetail();return}
     closeSheet()}
   else if(a==='new-job'){S.editing=null;openSheet('form');renderForm()}
   else if(a==='edit'){S.editing=Object.assign({},findJob(S.openKey));S.sheet='form';renderForm()}
@@ -1497,6 +1583,11 @@ document.addEventListener('click',async ev=>{
   else if(a==='preset'){const f=$('#jobform');f.elements.service.value=v;document.querySelectorAll('.preset').forEach(b=>b.classList.toggle('on',b.dataset.v===v))}
   else if(a==='status'||a==='quick'){
     const j=findJob(a==='quick'?v:S.openKey);if(!j)return;const s=a==='quick'?el.dataset.s:v;S.confirmCancel=false;
+    if(s==='done'&&steps(j).length>stepsDone(j)&&el.dataset.force!=='1'){
+      S.openKey=j.wid+'/'+j.id;S.confirmDone=true;
+      if(S.sheet!=='detail'){S.returnSearch=false;S.returnClient=null;S.returnReg=null;openSheet('detail')}
+      renderDetail();$('#panel').scrollTop=0;return}
+    S.confirmDone=false;
     await write(()=>jobsCol(j.wid).doc(j.id).update({status:s,updatedAt:Date.now()}),'Marked '+STATUS[s].toLowerCase());
     if(S.sheet==='detail')renderDetail();
   }
@@ -1511,6 +1602,11 @@ document.addEventListener('click',async ev=>{
   else if(a==='backup'){downloadBackup()}
   else if(a==='import-no'){S.importData=null;render()}
   else if(a==='import-yes'){await runImport()}
+  else if(a==='reg-history'){if(!S.manager)return;S.regFrom=S.sheet==='detail'?S.openKey:null;S.viewReg=v;S.sheet='reghist';renderRegHistory();$('#panel').scrollTop=0}
+  else if(a==='step'){const j=findJob(S.openKey);if(!j)return;const arr=steps(j).map(x=>Object.assign({},x));const i=Number(v);if(!arr[i])return;arr[i].d=!arr[i].d;if(arr[i].d)arr[i].at=Date.now();else delete arr[i].at;await saveSteps(j,arr)}
+  else if(a==='step-rm'){const j=findJob(S.openKey);if(!j)return;const arr=steps(j).filter((x,i)=>i!==Number(v));await saveSteps(j,arr)}
+  else if(a==='step-defaults'){const j=findJob(S.openKey);if(!j)return;await saveSteps(j,defaultSteps(j.service))}
+  else if(a==='done-no'){S.confirmDone=false;renderDetail()}
   else if(a==='cancel-ask'){S.confirmCancel=true;renderDetail()}
   else if(a==='cancel-no'){S.confirmCancel=false;renderDetail()}
   else if(a==='copymsg'){const j=findJob(S.openKey);if(!j)return;try{await navigator.clipboard.writeText(reminderText(j));toast('Message copied. Paste it into a text or WhatsApp.')}catch(e){toast('Copy failed. Use the Text or WhatsApp button instead.')}}
@@ -1587,6 +1683,7 @@ document.addEventListener('submit',ev=>{
   if(ev.target.id==='jobform')submitForm(ev.target);
   if(ev.target.id==='composer')sendMsg();
   if(ev.target.id==='techform')addTech();
+  if(ev.target.id==='stepform')addStep();
   if(ev.target.id==='clientform')saveClient(ev.target);
   if(ev.target.id==='linkform'){const em=String(($('#link-email')||{}).value||'').trim().toLowerCase();
     if(!EMAIL_RE.test(em)){toast('Type your email address.');return}
