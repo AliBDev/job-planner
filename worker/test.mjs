@@ -1,0 +1,41 @@
+import worker, { verifyFirebaseToken } from './index.js';
+import { webcrypto } from 'node:crypto';
+const PID = 'custom-remaps-planner';
+const kp = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1,0,1]), hash: 'SHA-256' }, true, ['sign','verify']);
+const jwk = Object.assign(await crypto.subtle.exportKey('jwk', kp.publicKey), { kid: 'k1', alg: 'RS256', use: 'sig' });
+const b64 = o => Buffer.from(typeof o === 'string' ? o : JSON.stringify(o)).toString('base64url');
+async function token(over = {}, kid = 'k1') {
+  const now = Math.floor(Date.now() / 1000);
+  const h = b64({ alg: 'RS256', kid, typ: 'JWT' });
+  const p = b64(Object.assign({ aud: PID, iss: 'https://securetoken.google.com/' + PID, sub: 'u1', iat: now - 5, exp: now + 3600 }, over));
+  const sig = Buffer.from(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', kp.privateKey, new TextEncoder().encode(h + '.' + p))).toString('base64url');
+  return h + '.' + p + '.' + sig;
+}
+let dvlaCalls = [];
+const fakeFetch = async (url, init) => {
+  if (String(url).includes('googleapis.com')) return new Response(JSON.stringify({ keys: [jwk] }), { status: 200 });
+  dvlaCalls.push({ url, init });
+  const reg = JSON.parse(init.body).registrationNumber;
+  if (reg === 'NOPE1') return new Response('{}', { status: 404 });
+  return new Response(JSON.stringify({ registrationNumber: reg, make: 'VOLKSWAGEN', colour: 'GREY', yearOfManufacture: 2019, fuelType: 'PETROL', engineCapacity: 1984, motStatus: 'Valid', motExpiryDate: '2027-03-01', taxStatus: 'Taxed' }), { status: 200 });
+};
+const env = { DVLA_API_KEY: 'secret-key', FIREBASE_PROJECT_ID: PID, ALLOWED_ORIGIN: 'https://alibdev.github.io' };
+const req = (tok, body, origin = 'https://alibdev.github.io', method = 'POST') => new Request('https://w.example/', { method, headers: { Origin: origin, Authorization: tok ? 'Bearer ' + tok : '', 'Content-Type': 'application/json' }, body: method === 'POST' ? JSON.stringify(body) : undefined });
+let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
+const run = (r) => worker.fetch(r, env, {}, fakeFetch);
+let r = await run(req(await token(), { reg: 'yx19 ktl' }));
+ok(r.status === 200, 'valid token + reg -> 200'); const j = await r.json(); ok(j.make === 'VOLKSWAGEN' && j.year === 2019, 'returns mapped fields');
+ok(dvlaCalls[0].init.headers['x-api-key'] === 'secret-key' && JSON.parse(dvlaCalls[0].init.body).registrationNumber === 'YX19KTL', 'key sent to DVLA, reg normalised');
+ok(!JSON.stringify(j).includes('secret-key'), 'key never in response');
+ok(r.headers.get('Access-Control-Allow-Origin') === 'https://alibdev.github.io', 'CORS header');
+ok((await run(req('', { reg: 'AB12CDE' }))).status === 401, 'no token -> 401');
+ok((await run(req(await token({ exp: 1 }), { reg: 'AB12CDE' }))).status === 401, 'expired token -> 401');
+ok((await run(req(await token({ aud: 'other' }), { reg: 'AB12CDE' }))).status === 401, 'wrong project -> 401');
+const t = await token(); ok((await run(req(t.slice(0, -4) + 'AAAA', { reg: 'AB12CDE' }))).status === 401, 'tampered signature -> 401');
+ok((await run(req(await token({}, 'zzz'), { reg: 'AB12CDE' }))).status === 401, 'unknown key id -> 401');
+const n = dvlaCalls.length; ok((await run(req(await token(), { reg: 'AB12CDE' }, 'https://evil.example'))).status === 403 && dvlaCalls.length === n, 'wrong origin -> 403, DVLA not called');
+ok((await run(req(await token(), { reg: '!' }))).status === 400, 'bad reg -> 400');
+ok((await run(req(await token(), { reg: 'NOPE1' }))).status === 404, 'unknown reg -> 404');
+ok((await run(req(null, null, 'https://alibdev.github.io', 'OPTIONS'))).status === 204, 'preflight 204');
+ok((await run(req(null, null, 'https://alibdev.github.io', 'GET'))).status === 405, 'GET -> 405');
+console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
