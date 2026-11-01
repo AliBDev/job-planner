@@ -312,6 +312,8 @@ legend{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:
 .addstep input{flex:1;min-width:0;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink)}
 .chkhead{display:flex;justify-content:space-between;align-items:baseline}
 .lnk{color:var(--accent);overflow-wrap:anywhere}
+.exsum{font-size:14px;color:var(--muted)}
+.exsum b{color:var(--ink);font-family:var(--mono)}
 .b-steps{color:var(--b-mute);font-size:clamp(12px,1vw,24px)}
 .weekbar .mo{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .datepick{background:transparent;border:1px solid var(--head-line);color:var(--head-soft);border-radius:999px;height:32px;padding:0 10px;font-size:13px;font-weight:600;color-scheme:dark;max-width:140px;min-width:0}
@@ -800,6 +802,56 @@ async function addStep(){
 
 /* ---------- reg history ---------- */
 const normReg=r=>String(r||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+/* ---------- accountant export ---------- */
+function exState(){return S.ex||(S.ex={when:'lastmonth',from:'',to:'',cancelled:false})}
+function exRange(x){
+  const d=new Date();const y=d.getFullYear(),m=d.getMonth();
+  if(x.when==='month')return [iso(new Date(y,m,1)),iso(new Date(y,m+1,0))];
+  if(x.when==='lastmonth')return [iso(new Date(y,m-1,1)),iso(new Date(y,m,0))];
+  if(x.when==='taxyear'||x.when==='lasttaxyear'){
+    let sy=(m>3||(m===3&&d.getDate()>=6))?y:y-1;if(x.when==='lasttaxyear')sy-=1;
+    return [sy+'-04-06',(sy+1)+'-04-05'];
+  }
+  if(x.when==='year')return [y+'-01-01',y+'-12-31'];
+  let a=x.from||'',b=x.to||'';if(a&&b&&a>b){const t=a;a=b;b=t}return [a,b];
+}
+function exJobs(x){
+  const r=exRange(x);if(!r[0]||!r[1])return [];
+  return S.jobs.filter(j=>j.date>=r[0]&&j.date<=r[1]&&(x.cancelled||j.status!=='cancelled')).sort(byStart);
+}
+function csvCell(v){
+  if(typeof v==='number')return String(v);
+  let t=String(v==null?'':v);
+  if(/^[=+\-@\t\r]/.test(t))t="'"+t;   /* stops spreadsheets running customer text as a formula */
+  return /[",\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;
+}
+function buildCsv(list){
+  const head=['Date','Start','Customer','Reg','Vehicle','Service','Type','Technician','Status','Price','Deposit','Paid','Left to collect','Job ID'];
+  const rows=list.map(j=>{const price=Number(j.price)||0,dep=Number(j.deposit)||0;const left=(j.paid||j.status==='cancelled')?0:Math.max(0,price-dep);
+    return [j.date||'',j.start||'',j.customerName||'',j.reg||'',j.vehicle||'',j.service||'',j.type==='mobile'?'Mobile':'Unit',jobTechName(j),STATUS[j.status||'booked']||'Booked',price.toFixed(2),dep.toFixed(2),j.paid?'Yes':'No',left.toFixed(2),j.id||''].map(csvCell).join(',')});
+  return '\uFEFF'+[head.join(',')].concat(rows).join('\r\n')+'\r\n';
+}
+function exportBoxHTML(){
+  const x=exState();const list=exJobs(x);const r=exRange(x);
+  const live=list.filter(j=>j.status!=='cancelled');
+  const billed=live.reduce((a,j)=>a+(Number(j.price)||0),0);
+  const paid=live.filter(j=>j.paid).reduce((a,j)=>a+(Number(j.price)||0),0);
+  const opt=(v,l)=>'<option value="'+v+'"'+(x.when===v?' selected':'')+'>'+l+'</option>';
+  let h='<form class="box" id="exform" novalidate><span class="lab">Export for your accountant</span><p class="note">Downloads a spreadsheet (CSV) with one row per job: date, customer, reg, service, price, deposit, paid or unpaid, and what is left to collect. It uses the job date.</p>'+
+    '<div class="f"><label for="ex-when">Period</label><select id="ex-when" name="when">'+opt('lastmonth','Last month')+opt('month','This month')+opt('lasttaxyear','Last tax year (6 Apr to 5 Apr)')+opt('taxyear','This tax year (6 Apr to 5 Apr)')+opt('year','This calendar year')+opt('custom','Choose dates')+'</select></div>';
+  if(x.when==='custom')h+='<div class="grid2"><div class="f"><label for="ex-from">From</label><input type="date" id="ex-from" name="from" value="'+esc(x.from)+'"></div><div class="f"><label for="ex-to">To</label><input type="date" id="ex-to" name="to" value="'+esc(x.to)+'"></div></div>';
+  h+='<label class="check" for="ex-cancelled"><input type="checkbox" id="ex-cancelled" name="cancelled"'+(x.cancelled?' checked':'')+'>Include cancelled jobs</label>';
+  h+='<p class="exsum">'+(r[0]&&r[1]?esc(shortDay(r[0]))+' '+esc(r[0].slice(0,4))+' to '+esc(shortDay(r[1]))+' '+esc(r[1].slice(0,4))+': ':'Pick both dates: ')+'<b>'+live.length+'</b> '+(live.length===1?'job':'jobs')+(live.length?', billed <b>'+money2(billed)+'</b>, paid <b>'+money2(paid)+'</b>, unpaid <b>'+money2(billed-paid)+'</b>':'')+'</p>';
+  return h+'<button type="button" class="btn pri" style="align-self:flex-start" data-act="export-csv"'+(list.length?'':' disabled')+'>Download CSV</button></form>';
+}
+function exportCsv(){
+  const x=exState();const list=exJobs(x);if(!list.length){toast('No jobs in that period.');return}
+  const r=exRange(x);const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([buildCsv(list)],{type:'text/csv;charset=utf-8'}));
+  a.download='custom-remaps-jobs-'+r[0]+'-to-'+r[1]+'.csv';document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast('Downloaded '+list.length+(list.length===1?' job.':' jobs.'));
+}
+
 function regJobs(reg){const k=normReg(reg);return k?S.jobs.filter(j=>normReg(j.reg)===k).sort(byStart).reverse():[]}
 
 function payPill(j){if(j.status==='cancelled')return '';return j.paid?'<span class="pill p-paid">Paid</span>':'<span class="pill p-unpaid">Unpaid</span>'}
@@ -937,6 +989,7 @@ function renderMoney(){
     const act=g.client?'data-act="client-open" data-v="'+esc(g.client.id)+'"':'data-act="open" data-v="'+esc(oldJ.wid+'/'+oldJ.id)+'"';
     const days=Math.round((parse(t)-parse(g.oldest))/86400000);
     return '<button class="crow" '+act+'><span class="nm"><b>'+esc(g.name)+'</b><span>'+g.jobs.length+(g.jobs.length===1?' unpaid job':' unpaid jobs')+' · oldest '+(days<=0?'today':days===1?'yesterday':days+' days ago')+'</span></span><span class="cr-r"><span class="price" style="color:var(--bad)">'+money2(g.owed)+'</span></span></button>'}).join('')+'</div>';
+  h+=exportBoxHTML();
   h+='<p class="note">Collected counts jobs marked paid plus deposits taken. Owed counts unpaid jobs up to today; upcoming jobs aren\'t owed yet.</p>';
   $('#view').innerHTML=h;
 }
@@ -1607,6 +1660,7 @@ document.addEventListener('click',async ev=>{
   else if(a==='step-rm'){const j=findJob(S.openKey);if(!j)return;const arr=steps(j).filter((x,i)=>i!==Number(v));await saveSteps(j,arr)}
   else if(a==='step-defaults'){const j=findJob(S.openKey);if(!j)return;await saveSteps(j,defaultSteps(j.service))}
   else if(a==='done-no'){S.confirmDone=false;renderDetail()}
+  else if(a==='export-csv'){exportCsv()}
   else if(a==='cancel-ask'){S.confirmCancel=true;renderDetail()}
   else if(a==='cancel-no'){S.confirmCancel=false;renderDetail()}
   else if(a==='copymsg'){const j=findJob(S.openKey);if(!j)return;try{await navigator.clipboard.writeText(reminderText(j));toast('Message copied. Paste it into a text or WhatsApp.')}catch(e){toast('Copy failed. Use the Text or WhatsApp button instead.')}}
@@ -1659,6 +1713,7 @@ document.addEventListener('click',async ev=>{
 document.addEventListener('change',ev=>{
   const t=ev.target;
   if(t.id==='worker-filter'){S.worker=t.value;render()}
+  if(t.form&&t.form.id==='exform'){const x=exState();x[t.name]=t.type==='checkbox'?t.checked:t.value;render()}
   if(t.id==='import-file'&&t.files&&t.files[0]){readImport(t.files[0]);t.value=''}
   if(t.id==='goto-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.day=t.value;render()}
   if(t.form&&t.form.id==='sqform')sqUpdate(t);
