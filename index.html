@@ -74,7 +74,10 @@ h1{margin:0;font-family:var(--display);font-weight:700;font-size:30px;line-heigh
 .weekbar{display:flex;align-items:center;gap:6px}
 .weekbar .mo{flex:1;font-size:13px;color:var(--head-soft)}
 .wbtn{background:transparent;border:1px solid var(--head-line);color:var(--head-soft);border-radius:999px;min-width:36px;height:32px;padding:0 10px;font-size:13px;font-weight:600}
-.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.days{display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;position:relative;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;margin-inline:-4px;padding-inline:4px}
+.days::-webkit-scrollbar{display:none}
+.days .day{flex:0 0 calc((100% - 24px)/7);min-width:0;scroll-snap-align:start}
+.days .day.m1{box-shadow:inset 2px 0 0 var(--head-line);border-radius:0 10px 10px 0}
 .day{background:transparent;border:0;border-radius:10px;padding:7px 0;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--head-muted)}
 .day .n{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--head-ink)}
 .day .c{font-size:10px;min-height:13px}
@@ -728,20 +731,40 @@ function renderTop(){
   if(S.tab==='schedule'){
     title=S.manager?'Schedule':'My jobs';eyebrow=S.manager?longDay(S.day):longDay(today());
     if(S.manager){
-      const ws=weekStart(S.day);let days='';
-      for(let i=0;i<7;i++){const d=addDays(ws,i);const n=S.jobs.filter(j=>j.date===d&&j.status!=='cancelled').length;const dd=parse(d);
-        days+='<button class="day'+(d===S.day?' sel':'')+(d===today()?' today':'')+'" data-act="day" data-v="'+d+'" aria-label="'+esc(longDay(d))+', '+n+' jobs"'+(d===S.day?' aria-current="date"':'')+'><span>'+DOW[dd.getDay()]+'</span><span class="n">'+dd.getDate()+'</span><span class="c">'+(n||'–')+'</span></button>'}
-      const ws2=parse(ws),we=parse(addDays(ws,6));
-      const mo=ws2.getMonth()===we.getMonth()?MONL[ws2.getMonth()]+' '+ws2.getFullYear():MON[ws2.getMonth()]+' – '+MON[we.getMonth()]+' '+we.getFullYear();
-      extra='<div class="weekbar"><button class="wbtn" data-act="week" data-v="-7" aria-label="Previous week">‹</button><span class="mo">'+esc(mo)+'</span><label for="goto-date" class="sr">Go to date</label><input type="date" id="goto-date" class="datepick" value="'+esc(S.day)+'">'+(S.day!==today()?'<button class="wbtn" data-act="day" data-v="'+today()+'">Today</button>':'')+'<button class="wbtn" data-act="week" data-v="7" aria-label="Next week">›</button></div><div class="days">'+days+'</div>';
+      const t0=today();const first=addDays(S.day<t0?S.day:t0,S.day<t0?-3:-14);const last=addDays(S.day>addDays(t0,120)?S.day:addDays(t0,120),7);
+      const cnt={};S.jobs.forEach(j=>{if(j.status!=='cancelled')cnt[j.date]=(cnt[j.date]||0)+1});
+      let days='';
+      for(let d=first;d<=last;d=addDays(d,1)){const n=cnt[d]||0;const dd=parse(d);
+        days+='<button class="day'+(d===S.day?' sel':'')+(d===t0?' today':'')+(dd.getDate()===1?' m1':'')+'" data-act="day" data-v="'+d+'" aria-label="'+esc(longDay(d))+', '+n+' jobs"'+(d===S.day?' aria-current="date"':'')+'><span>'+DOW[dd.getDay()]+'</span><span class="n">'+dd.getDate()+'</span><span class="c">'+(n||'–')+'</span></button>'}
+      const sd=parse(S.day);const mo=MONL[sd.getMonth()]+' '+sd.getFullYear();
+      extra='<div class="weekbar"><button class="wbtn" data-act="week" data-v="-7" aria-label="Back one week">‹</button><span class="mo" id="daymo">'+esc(mo)+'</span><label for="goto-date" class="sr">Go to date</label><input type="date" id="goto-date" class="datepick" value="'+esc(S.day)+'">'+(S.day!==t0?'<button class="wbtn" data-act="today">Today</button>':'')+'<button class="wbtn" data-act="week" data-v="7" aria-label="Forward one week">›</button></div><div class="days" id="days" data-first="'+esc(first)+'" role="group" aria-label="Days. Swipe sideways to see more.">'+days+'</div>';
     }
   }else if(S.tab==='messages'){title='Messages';const u=totalUnread();eyebrow=u?u+' unread':'All caught up'}
   else if(S.tab==='clients'){title='Clients';eyebrow=S.clients.length+(S.clients.length===1?' saved client':' saved clients')}
   else if(S.tab==='money'){title='Money';eyebrow=longDay(today())}
   else{title='Team';eyebrow=S.techs.length+(S.techs.length===1?' technician':' technicians')}
   const sbtn=S.tab==='schedule'?'<button class="hbtn" data-act="search" aria-label="Find a job">'+ICON.search+'</button>':'';
-  $('#top-inner').innerHTML='<img class="brand" src="assets/logo-app.png" alt="Custom Remaps UK"><div class="toprow"><div><div class="eyebrow">'+esc(eyebrow)+'</div><h1>'+esc(title)+'</h1></div><span class="tright">'+sbtn+role+'</span></div>'+extra;
+  const html='<img class="brand" src="assets/logo-app.png" alt="Custom Remaps UK"><div class="toprow"><div><div class="eyebrow">'+esc(eyebrow)+'</div><h1>'+esc(title)+'</h1></div><span class="tright">'+sbtn+role+'</span></div>'+extra;
+  const old=$('#days');const keepLeft=old?old.scrollLeft:null;const wasFocus=document.activeElement&&document.activeElement.id==='goto-date';
+  if(S.topHtml!==html){S.topHtml=html;$('#top-inner').innerHTML=html;if(wasFocus){const g=$('#goto-date');if(g)g.focus()}}
+  const strip=$('#days');
+  if(strip){
+    if(S.centerDay||keepLeft==null){const smooth=!!S.centerDay&&keepLeft!=null;S.centerDay=false;centerSelected(smooth)}
+    else strip.scrollLeft=keepLeft;
+  }
 }
+function centerSelected(smooth){
+  const strip=$('#days');const el=strip&&strip.querySelector('.day.sel');if(!el)return;
+  const left=Math.max(0,el.offsetLeft-4-(strip.clientWidth-el.offsetWidth)/2);
+  if(smooth&&strip.scrollTo)strip.scrollTo({left:left,behavior:'smooth'});else strip.scrollLeft=left;
+}
+function dayLabelFromScroll(){
+  const strip=$('#days'),mo=$('#daymo');if(!strip||!mo)return;
+  const b=strip.querySelector('.day');if(!b)return;
+  const step=b.offsetWidth+4;const idx=Math.max(0,Math.round((strip.scrollLeft+strip.clientWidth/2-4)/step-.5));
+  const d=parse(addDays(strip.dataset.first,idx));mo.textContent=MONL[d.getMonth()]+' '+d.getFullYear();
+}
+document.addEventListener('scroll',e=>{if(e.target&&e.target.id==='days'){cancelAnimationFrame(S.dlf);S.dlf=requestAnimationFrame(dayLabelFromScroll)}},true);
 function renderNav(){
   $('#nav').hidden=false;
   const u=totalUnread();
@@ -906,7 +929,7 @@ function workloadHTML(){
 }
 
 /* ---------- day rollover ---------- */
-function checkDay(){const t=today();if(S.lastToday!==t){if(S.day===S.lastToday)S.day=t;S.lastToday=t;if(S.ready)render()}}
+function checkDay(){const t=today();if(S.lastToday!==t){if(S.day===S.lastToday){S.day=t;S.centerDay=true}S.lastToday=t;if(S.ready)render()}}
 function openSheet(kind){S.sheet=kind;$('#sheet').hidden=false;document.body.style.overflow='hidden'}
 function closeSheet(){S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;$('#sheet').hidden=true;$('#panel').innerHTML='';document.body.style.overflow=''}
 function renderDetail(){
@@ -1484,7 +1507,8 @@ document.addEventListener('click',async ev=>{
   const a=el.dataset.act,v=el.dataset.v;
   if(a==='tab'){S.tab=v;S.thread=null;closeSheet();render();window.scrollTo(0,0)}
   else if(a==='day'){S.day=v;render()}
-  else if(a==='week'){S.day=addDays(S.day,Number(v));render()}
+  else if(a==='week'){S.day=addDays(S.day,Number(v));S.centerDay=true;render()}
+  else if(a==='today'){S.day=today();S.centerDay=true;render()}
   else if(a==='type'){S.type=v;render()}
   else if(a==='open'){if(!findJob(v)){toast('That job is no longer on your list.');return}const rc=(S.sheet==='clientview')?S.viewClient:null;const rs=S.sheet==='search'||(S.sheet==='detail'&&S.returnSearch);S.viewClient=null;S.returnClient=rc;S.returnSearch=rs;S.openKey=v;S.confirmDel=false;S.confirmCancel=false;openSheet('detail');renderDetail();$('#panel').scrollTop=0}
   else if(a==='close'){
@@ -1564,7 +1588,7 @@ document.addEventListener('change',ev=>{
   const t=ev.target;
   if(t.id==='worker-filter'){S.worker=t.value;render()}
   if(t.id==='import-file'&&t.files&&t.files[0]){readImport(t.files[0]);t.value=''}
-  if(t.id==='goto-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.day=t.value;render()}
+  if(t.id==='goto-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.day=t.value;S.centerDay=true;render()}
   if(t.form&&t.form.id==='sqform')sqUpdate(t);
   if(t.name==='type'&&t.form&&t.form.id==='jobform')applyType(t.value==='mobile');
   if(t.form&&t.form.id==='jobform'){updateLeft();updateClash()}
