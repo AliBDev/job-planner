@@ -474,6 +474,8 @@ const FIREBASE_CONFIG={
 };
 /* Manager accounts: full access. Must match the list in the Firestore security rules. */
 const MANAGER_EMAILS=['abhatti89@gmail.com','faisalcruk@gmail.com','mishkatcruk@gmail.com'];
+/* The unit screen (TV board) is switched off for now. Set this to true to bring it back. */
+const FEATURE_UNIT_SCREEN=false;
 const EMAIL_RE=/^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const APP_URL=location.origin+location.pathname;
 
@@ -1299,7 +1301,7 @@ function renderTeam(){
   const ae=document.activeElement;const focusId=ae&&ae.id;
   const keep={};['tech-name','tech-phone','tech-email','te-input'].forEach(id=>{const e=document.getElementById(id);if(e)keep[id]=e.value});
   const linkKeep={};document.querySelectorAll('.linksel').forEach(s=>{linkKeep[s.id]=s.value});
-  let h='<div class="box"><span class="lab">Unit screen</span><p class="note">Show today\'s unit jobs on a TV in the operations room. Prices are hidden and it updates as soon as a job is added or changed. On the TV, open this app\'s link with <b class="mono-s">#board</b> added to the end, signed in as the Manager.</p><button class="btn soft" style="align-self:flex-start" data-act="board-open">Open unit screen</button></div>'+
+  let h=(!FEATURE_UNIT_SCREEN?'':'<div class="box"><span class="lab">Unit screen</span><p class="note">Show today\'s unit jobs on a TV in the operations room. Prices are hidden and it updates as soon as a job is added or changed. On the TV, open this app\'s link with <b class="mono-s">#board</b> added to the end, signed in as the Manager.</p><button class="btn soft" style="align-self:flex-start" data-act="board-open">Open unit screen</button></div>')+
     '<form class="box" id="techform" novalidate><span class="lab">Add a technician</span>'+
     '<div class="f"><label for="tech-name">Name</label><input id="tech-name" autocomplete="off" maxlength="60" placeholder="e.g. Dan Morris"></div>'+
     '<div class="f"><label for="tech-phone">Phone (optional)</label><input id="tech-phone" type="tel" class="mono" maxlength="30" autocomplete="off"></div>'+
@@ -1478,6 +1480,7 @@ function renderBoard(){
 let wakeLock=null;
 async function wake(){try{if(S.mode==='board'&&!wakeLock&&navigator.wakeLock&&document.visibilityState==='visible'){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}
 function setBoard(on){
+  on=on&&FEATURE_UNIT_SCREEN;
   S.mode=on?'board':'app';
   document.body.classList.toggle('boardmode',on);
   $('#board').hidden=!on;$('#top').hidden=on;$('#appmain').hidden=on;$('#nav').hidden=on;
@@ -1574,7 +1577,7 @@ document.addEventListener('click',async ev=>{
   else if(a==='unpick-client'){const f=$('#jobform');if(!f)return;f.elements.clientId.value='';$('#f-lookup').innerHTML=lookupHTML(null);$('#saveclient-wrap').hidden=false;const s=$('#f-client');if(s){s.focus();showSugg('')}}
   else if(a==='search'){openSheet('search');renderSearch();const s=$('#sq-text');if(s)s.focus()}
   else if(a==='sq-reset'){S.sq=sqDefaults();renderSearch();const s=$('#sq-text');if(s)s.focus()}
-  else if(a==='board-open'){location.hash='board';if(location.hash!=='#board')setBoard(true)}
+  else if(a==='board-open'){if(!FEATURE_UNIT_SCREEN)return;location.hash='board';if(location.hash!=='#board')setBoard(true)}
   else if(a==='board-priv'){store('board:private',store('board:private')==='1'?'0':'1');renderBoard()}
   else if(a==='board-exit'){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}setBoard(false)}
   else if(a==='board-full'){try{const r=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();if(r&&r.catch)r.catch(()=>toast('Full screen isn\'t available here. Use the TV browser\'s own full screen option.'))}catch(e){toast('Full screen isn\'t available here. Use the TV browser\'s own full screen option.')}wake()}
