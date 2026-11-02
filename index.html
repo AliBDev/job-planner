@@ -476,6 +476,8 @@ const FIREBASE_CONFIG={
 const MANAGER_EMAILS=['abhatti89@gmail.com','faisalcruk@gmail.com','mishkatcruk@gmail.com'];
 /* The unit screen (TV board) is switched off for now. Set this to true to bring it back. */
 const FEATURE_UNIT_SCREEN=false;
+/* Messaging (Messages tab, Team chat, direct messages and the message buttons) is switched off for now. Set to true to bring it back. */
+const FEATURE_MESSAGING=false;
 const EMAIL_RE=/^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const APP_URL=location.origin+location.pathname;
 
@@ -622,12 +624,13 @@ function subJobs(key,wid){
   },onErr);
 }
 function subDM(wid){
-  if(S.subs['dm:'+wid])return;
+  if(!FEATURE_MESSAGING||S.subs['dm:'+wid])return;
   S.subs['dm:'+wid]=dmCol(wid).orderBy('at','desc').limit(200).onSnapshot(snap=>{
     S.dm[wid]=snap.docs.map(d=>Object.assign({id:d.id},d.data())).reverse();afterMsgs();
   },onErr);
 }
 function subTeam(){
+  if(!FEATURE_MESSAGING)return;
   S.subs.team=teamCol().orderBy('at','desc').limit(200).onSnapshot(snap=>{
     S.team=snap.docs.map(d=>Object.assign({id:d.id},d.data())).reverse();afterMsgs();
   },onErr);
@@ -777,7 +780,7 @@ function renderNav(){
   $('#nav').hidden=false;
   const u=totalUnread();
   const tabs=S.manager?[['schedule','Schedule',ICON.cal],['clients','Clients',ICON.book],['money','Money',ICON.money],['messages','Messages',ICON.chat],['team','Team',ICON.team]]:[['schedule','My jobs',ICON.cal],['messages','Messages',ICON.chat]];
-  $('#nav-inner').innerHTML=tabs.map(t=>'<button class="tab'+(S.tab===t[0]?' on':'')+'" data-act="tab" data-v="'+t[0]+'"'+(S.tab===t[0]?' aria-current="page"':'')+'>'+t[2]+t[1]+(t[0]==='messages'&&u?'<span class="badge">'+u+'</span>':'')+'</button>').join('');
+  $('#nav-inner').innerHTML=tabs.filter(t=>FEATURE_MESSAGING||t[0]!=='messages').map(t=>'<button class="tab'+(S.tab===t[0]?' on':'')+'" data-act="tab" data-v="'+t[0]+'"'+(S.tab===t[0]?' aria-current="page"':'')+'>'+t[2]+t[1]+(t[0]==='messages'&&u?'<span class="badge">'+u+'</span>':'')+'</button>').join('');
 }
 const byStart=(a,b)=>(a.date+a.start).localeCompare(b.date+b.start);
 function jobBal(j){return Math.max(0,(Number(j.price)||0)-(Number(j.deposit)||0))}
@@ -979,7 +982,7 @@ function renderDetail(){
       ['booked','in_progress','done'].map(s=>'<button class="'+(st===s?'on':'')+'" data-act="status" data-v="'+s+'" aria-pressed="'+(st===s)+'">'+STATUS[s]+'</button>').join('')+'</div></div>';
   }
   const target=S.manager?(j.wid?'Message '+esc(firstName(j.wid))+' about this job':'Post about this job in Team chat'):'Message the office about this job';
-  if(canAct)h+='<button class="btn pri block" data-act="msg-job">'+ICON.chat+target+'</button>';
+  if(canAct&&FEATURE_MESSAGING)h+='<button class="btn pri block" data-act="msg-job">'+ICON.chat+target+'</button>';
   if(S.manager){
     if(st==='cancelled')h+='<button class="btn ghost" data-act="status" data-v="booked">Restore job</button>';
     else if(S.confirmCancel)h+='<div class="confirm"><p>Cancel this job? It stays on the schedule crossed out, and you can restore it later.</p><div class="two"><button class="btn ghost" data-act="cancel-no">Keep it</button><button class="btn danger solid" data-act="status" data-v="cancelled">Cancel job</button></div></div>';
@@ -1293,7 +1296,7 @@ async function sendMsg(){
   const ok=await write(()=>col.add(body));
   if(ok){S.pendingRef=null;renderPending()}else ta.value=text;
 }
-function openThread(k){S.tab='messages';S.thread=k;markSeen(k);closeSheet();render();window.scrollTo(0,document.body.scrollHeight)}
+function openThread(k){if(!FEATURE_MESSAGING)return;S.tab='messages';S.thread=k;markSeen(k);closeSheet();render();window.scrollTo(0,document.body.scrollHeight)}
 
 /* ---------- team ---------- */
 function renderTeam(){
@@ -1320,7 +1323,7 @@ function renderTeam(){
       act=up?'<span class="note">Move their '+up+' upcoming '+(up===1?'job':'jobs')+' to someone else first.</span><button class="btn ghost sm" data-act="rm-no">OK</button>'
         :'<span class="note">Remove '+esc(t.name)+'?</span><button class="btn ghost sm" data-act="rm-no">Keep</button><button class="btn danger solid sm" data-act="tech-rm-yes" data-v="'+esc(t.id)+'">Remove</button>';
     }else{
-      act=(t.uid?'<button class="btn ghost sm" data-act="thread" data-v="dm:'+esc(t.uid)+'">Message</button><button class="btn ghost sm" data-act="unlink" data-v="'+esc(t.id)+'">Unlink app</button>':'')+'<button class="btn ghost sm" data-act="tech-email" data-v="'+esc(t.id)+'">'+(t.email?'Change email':'Give app access')+'</button><button class="btn danger sm" data-act="tech-rm" data-v="'+esc(t.id)+'">Remove</button>';
+      act=(t.uid?(FEATURE_MESSAGING?'<button class="btn ghost sm" data-act="thread" data-v="dm:'+esc(t.uid)+'">Message</button>':'')+'<button class="btn ghost sm" data-act="unlink" data-v="'+esc(t.id)+'">Unlink app</button>':'')+'<button class="btn ghost sm" data-act="tech-email" data-v="'+esc(t.id)+'">'+(t.email?'Change email':'Give app access')+'</button><button class="btn danger sm" data-act="tech-rm" data-v="'+esc(t.id)+'">Remove</button>';
     }
     return '<div class="crew">'+techAv(t,'lg')+'<span class="nm"><b>'+esc(t.name)+'</b><span>'+sub+'</span></span><span class="acts">'+act+'</span>'+(S.editEmail===t.id?'<div class="linkrow"><label for="te-input" class="sr">Email for '+esc(t.name)+'</label><input id="te-input" type="email" class="csearch" value="'+esc(t.email||'')+'" placeholder="name@example.com" autocomplete="off"><button class="btn soft sm" data-act="tech-email-save" data-v="'+esc(t.id)+'">Save</button><button class="btn ghost sm" data-act="tech-email-cancel">Cancel</button></div>':'')+'</div>'}).join('')+'</div>';
   const free=S.techs.filter(t=>!t.uid);
@@ -1382,7 +1385,7 @@ function renderTeamOld(){
   else h+='<div class="list">'+S.crew.map(c=>{
       const wk=S.jobs.filter(j=>j.wid===c.id&&j.date>=ws&&j.date<=we&&j.status!=='cancelled').length;
       const up=S.jobs.filter(j=>j.wid===c.id&&j.date>=today()&&j.status!=='cancelled').length;
-      let act='<button class="btn ghost" style="padding:8px 10px;font-size:14px" data-act="thread" data-v="dm:'+esc(c.id)+'">Message</button>';
+      let act=FEATURE_MESSAGING?'<button class="btn ghost" style="padding:8px 10px;font-size:14px" data-act="thread" data-v="dm:'+esc(c.id)+'">Message</button>':'';
       if(S.confirmRemove===c.id){
         act=up?'<span class="note" style="max-width:150px">Reassign their '+up+' upcoming '+(up===1?'job':'jobs')+' first.</span><button class="btn ghost" style="padding:8px" data-act="rm-no">OK</button>':'<button class="btn ghost" style="padding:8px" data-act="rm-no">Keep</button><button class="btn danger solid" style="padding:8px 12px;font-size:14px" data-act="rm-yes" data-v="'+esc(c.id)+'">Remove</button>';
       }else act+='<button class="btn danger" style="padding:8px 10px;font-size:14px" data-act="rm" data-v="'+esc(c.id)+'">Remove</button>';
