@@ -1025,14 +1025,22 @@ function renderForm(){
 function lookupHTML(c){
   if(c)return '<div class="linked"><span>Saved client: <b>'+esc(c.name)+'</b></span><button type="button" data-act="unpick-client">Change</button></div>';
   if(!S.clients.length)return '';
-  return '<div class="f"><label for="f-client">Find a saved client</label><input id="f-client" type="search" autocomplete="off" placeholder="Search name, phone or address"><div class="sugg" id="f-sugg"></div></div>';
+  return '<div class="f"><label for="f-client">Find a saved client</label><input id="f-client" type="search" autocomplete="off" placeholder="Start typing a name"><div class="sugg" id="f-sugg"></div></div>';
 }
 function clientMatch(c,q){q=String(q||'').toLowerCase().trim();if(!q)return true;const qq=q.replace(/\s/g,'');
   return [c.name,c.phone,c.address,c.vehicle].some(x=>String(x||'').toLowerCase().includes(q))||String(c.reg||'').toLowerCase().replace(/\s/g,'').includes(qq)||String(c.phone||'').replace(/\s/g,'').includes(qq)}
+function suggFor(q){
+  q=String(q||'').toLowerCase().trim();if(!q)return [];
+  const nm=c=>String(c.name||'').toLowerCase();
+  /* one or two letters: names only. Three or more: also phone, address, vehicle and reg. */
+  const hits=S.clients.filter(c=>nm(c).includes(q)||(q.length>=3&&clientMatch(c,q)));
+  const rank=c=>nm(c).startsWith(q)?0:nm(c).split(/\s+/).some(w=>w.startsWith(q))?1:nm(c).includes(q)?2:3;
+  return hits.sort((a,b)=>rank(a)-rank(b)||nm(a).localeCompare(nm(b))).slice(0,6);
+}
 function showSugg(q){
   const box=$('#f-sugg');if(!box)return;
-  const list=S.clients.filter(c=>clientMatch(c,q)).slice(0,6);
-  box.innerHTML=list.length?list.map(c=>'<button type="button" data-act="pick-client" data-v="'+esc(c.id)+'"><span class="sn"><b>'+esc(c.name)+'</b><span>'+esc([firstLine(c.address),c.phone].filter(Boolean).join(' · '))+'</span></span>'+(c.price?'<span class="price">'+money(c.price)+'</span>':'')+'</button>').join(''):(q?'<span class="note">No saved client matches. Fill in the details below.</span>':'');
+  const list=suggFor(q);
+  box.innerHTML=list.length?list.map(c=>'<button type="button" data-act="pick-client" data-v="'+esc(c.id)+'"><span class="sn"><b>'+esc(c.name)+'</b><span>'+esc([firstLine(c.address),c.phone].filter(Boolean).join(' · '))+'</span></span>'+(c.price?'<span class="price">'+money(c.price)+'</span>':'')+'</button>').join(''):(String(q||'').trim()?'<span class="note">No saved client matches. Fill in the details below.</span>':'');
 }
 function applyType(mob){const b=$('#bay-wrap');if(b)b.hidden=mob;const l=$('#addr-label');if(l)l.textContent=mob?'Garage and address':'Customer address (optional)'}
 function fillFromClient(c){
