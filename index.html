@@ -171,7 +171,7 @@ select.small{font-size:13px;padding:7px 10px;border-radius:10px;border:1px solid
 .badge{position:absolute;top:0;left:calc(50% + 6px);min-width:18px;height:18px;border-radius:9px;background:var(--mobile-strong);color:#FFFFFF;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
 
 /* sheet */
-.sheet{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center}
+.sheet{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center;box-sizing:border-box;padding-bottom:var(--kb,0px)}
 .sheet-back{position:absolute;inset:0;background:rgba(9,13,16,.55)}
 .panel{position:relative;width:100%;max-width:640px;max-height:94%;overflow:auto;background:var(--bg);border-radius:18px 18px 0 0;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
 .dhead{background:var(--head);color:var(--head-ink);padding-block:12px 20px;display:flex;flex-direction:column;gap:14px;border-radius:18px 18px 0 0}
@@ -776,6 +776,15 @@ function dayLabelFromScroll(){
   const d=parse(addDays(strip.dataset.first,idx));mo.textContent=MONL[d.getMonth()]+' '+d.getFullYear();
 }
 document.addEventListener('scroll',e=>{if(e.target&&e.target.id==='days'){cancelAnimationFrame(S.dlf);S.dlf=requestAnimationFrame(dayLabelFromScroll)}},true);
+/* On-screen keyboard: lift the sheet above it so every field can be scrolled into view */
+(function(){
+  const vv=window.visualViewport;if(!vv)return;
+  const upd=()=>{const kb=Math.round(window.innerHeight-vv.height-vv.offsetTop);document.documentElement.style.setProperty('--kb',kb>100?kb+'px':'0px')};
+  vv.addEventListener('resize',upd);vv.addEventListener('scroll',upd);upd();
+  document.addEventListener('focusin',ev=>{const t=ev.target;
+    if(!t||!t.matches||!t.matches('input,textarea,select')||!t.closest('#panel'))return;
+    setTimeout(()=>{try{t.scrollIntoView({block:'center',behavior:'smooth'})}catch(e){}},350)});
+})();
 function renderNav(){
   $('#nav').hidden=false;
   const u=totalUnread();
