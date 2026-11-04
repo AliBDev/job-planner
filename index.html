@@ -1175,7 +1175,7 @@ function renderClients(){
   const s=$('#client-search');s.value=q;if(focused){s.focus();try{s.setSelectionRange(q.length,q.length)}catch(e){}}
 }
 function renderClientForm(){
-  const c=S.clientEdit||{};const isNew=!c.id;
+  const c=S.clientEdit||S.clientPrefill||{};const isNew=!c.id;S.clientPrefill=null;
   const opt=(val,label)=>'<option value="'+val+'"'+((c.type||'')===val?' selected':'')+'>'+label+'</option>';
   let h='<div class="fhead gut"><div class="inner2"><button type="button" data-act="'+(isNew?'close':'client-back')+'" style="color:var(--muted)">Cancel</button><h2>'+(isNew?'New client':'Edit client')+'</h2><button type="submit" form="clientform" class="save">Save</button></div></div>';
   h+='<form id="clientform" class="jobform gut" novalidate>';
@@ -1575,7 +1575,10 @@ document.addEventListener('click',async ev=>{
   else if(a==='rm'){S.confirmRemove=v;render()}
   else if(a==='rm-no'){S.confirmRemove=null;render()}
   else if(a==='rm-yes'){S.confirmRemove=null;await write(()=>S.db.doc('crew/'+v).delete(),'Removed from your team list')}
-  else if(a==='client-new'){S.clientEdit=null;S.confirmClientDel=false;openSheet('client');renderClientForm();const n=$('#c-name');if(n)n.focus()}
+  else if(a==='client-new'){S.clientEdit=null;S.confirmClientDel=false;
+    {const q=String(($('#client-search')||{}).value||'').trim().slice(0,80);   /* carry what was typed in the search box into the new client */
+     S.clientPrefill=!q?null:(/^[\d\s+()-]{5,}$/.test(q)?{phone:q}:{name:q})}
+    openSheet('client');renderClientForm();const n=$('#c-name');if(n){n.focus();try{n.setSelectionRange(n.value.length,n.value.length)}catch(e){}}}
   else if(a==='client-open'){const c=S.clients.find(x=>x.id===v);if(!c)return;S.viewClient=v;S.cvFilter='all';openSheet('clientview');renderClientView();$('#panel').scrollTop=0}
   else if(a==='client-edit'){const c=S.clients.find(x=>x.id===S.viewClient);if(!c)return;S.clientEdit=Object.assign({},c);S.confirmClientDel=false;S.sheet='client';renderClientForm();$('#panel').scrollTop=0}
   else if(a==='client-back'){const id=S.clientEdit&&S.clientEdit.id;S.clientEdit=null;S.confirmClientDel=false;S.viewClient=id;S.sheet='clientview';renderClientView();$('#panel').scrollTop=0}
