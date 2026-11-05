@@ -202,6 +202,11 @@ select.small{font-size:13px;padding:7px 10px;border-radius:10px;border:1px solid
 .seg .mob input:checked+span{color:var(--mobile)}
 .seg .uni input:checked+span{color:var(--unit)}
 .confirm{display:flex;flex-direction:column;gap:8px;background:var(--bad-soft);border-radius:12px;padding:12px}
+.confirm.dup{background:var(--accent-soft)}
+.confirm.dup p{color:var(--ink)}
+.confirm.dup .btn.soft,.confirm.dup .btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.confirm.dup .btn.soft{color:var(--accent);font-weight:600}
+.confirm.dup .btn{justify-content:flex-start;text-align:left;height:auto;min-height:44px;flex-wrap:wrap;gap:4px 8px}
 .confirm p{margin:0;color:var(--bad);font-size:14px}
 
 /* form */
@@ -913,8 +918,8 @@ function renderMoney(){
   const due=S.jobs.filter(j=>j.status!=='cancelled'&&!j.paid&&j.date<=t&&jobBal(j)>0);
   const groups={};
   due.forEach(j=>{
-    const nmL=String(j.customerName||'').trim().toLowerCase();
-    const c=j.clientId?S.clients.find(x=>x.id===j.clientId):S.clients.find(x=>String(x.name||'').trim().toLowerCase()===nmL);
+    const nmL=normName(j.customerName);
+    const c=j.clientId?S.clients.find(x=>x.id===j.clientId):S.clients.find(x=>nmL&&normName(x.name)===nmL);
     const k=c?'c:'+c.id:'n:'+(nmL||'?');
     if(!groups[k])groups[k]={name:c?c.name:(j.customerName||'No customer name'),client:c,jobs:[],owed:0,oldest:j.date};
     const g=groups[k];g.jobs.push(j);g.owed+=jobBal(j);if(j.date<g.oldest)g.oldest=j.date;
@@ -951,7 +956,7 @@ function workloadHTML(){
 /* ---------- day rollover ---------- */
 function checkDay(){const t=today();if(S.lastToday!==t){if(S.day===S.lastToday){S.day=t;S.centerDay=true}S.lastToday=t;if(S.ready)render()}}
 function openSheet(kind){S.sheet=kind;$('#sheet').hidden=false;document.body.style.overflow='hidden'}
-function closeSheet(){S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;$('#sheet').hidden=true;$('#panel').innerHTML='';document.body.style.overflow=''}
+function closeSheet(){S.dupAck=null;S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;$('#sheet').hidden=true;$('#panel').innerHTML='';document.body.style.overflow=''}
 function renderDetail(){
   const j=findJob(S.openKey);
   if(!j){closeSheet();return}
@@ -1033,6 +1038,7 @@ function renderForm(){
   h+='<fieldset><legend>Price</legend><div class="grid2"><div class="f"><label for="f-price">Job price (£)</label><input id="f-price" name="price" class="mono" inputmode="decimal" value="'+(j.price!=null&&j.price!==''?esc(j.price):'')+'"></div><div class="f"><label for="f-deposit">Deposit paid (£)</label><input id="f-deposit" name="deposit" class="mono" inputmode="decimal" value="'+(j.deposit?esc(j.deposit):'')+'"></div></div>'+
      '<div class="left"><span>Left to collect</span><b id="f-left">£0.00</b></div><div class="f"><span class="lab" id="paid-lab">Payment</span><div class="seg" role="radiogroup" aria-labelledby="paid-lab"><label class="unp"><input type="radio" name="paid" id="f-paid-no" value="no"'+(j.paid?'':' checked')+'><span>Unpaid</span></label><label class="pd"><input type="radio" name="paid" id="f-paid-yes" value="yes"'+(j.paid?' checked':'')+'><span>Paid</span></label></div></div></fieldset>';
   h+='<fieldset><legend>Notes</legend><div class="f"><label for="f-notes">Notes for the technician</label><textarea id="f-notes" name="notes" rows="2" placeholder="Garage contact, parking, anything to bring">'+esc(j.notes||'')+'</textarea></div></fieldset>';
+  h+='<div id="dup-slot" role="alert"></div>';
   h+='<button type="submit" class="btn pri block" id="f-submit">'+(isNew?'Save job':'Save changes')+'</button></form>';
   $('#panel').innerHTML=h;$('#panel').scrollTop=0;updateLeft();updateClash();
 }
@@ -1043,6 +1049,33 @@ function lookupHTML(c){
 }
 function clientMatch(c,q){q=String(q||'').toLowerCase().trim();if(!q)return true;const qq=q.replace(/\s/g,'');
   return [c.name,c.phone,c.address,c.vehicle].some(x=>String(x||'').toLowerCase().includes(q))||String(c.reg||'').toLowerCase().replace(/\s/g,'').includes(qq)||String(c.phone||'').replace(/\s/g,'').includes(qq)}
+/* ---------- duplicate names ---------- */
+/* normName: same customer apart from case, punctuation, '&' vs 'and', 'the', 'Ltd'. looseName also drops generic trade words. */
+const normName=s=>String(s||'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9\s]/g,' ').replace(/\b(the|ltd|limited|plc|llp)\b/g,' ').replace(/\s+/g,' ').trim();
+const looseName=s=>normName(s).replace(/\b(and|garages?|motors?|autos?|automotive|cars?|services?|centre|center|repairs?|tyres?|tires?)\b/g,' ').replace(/\s+/g,' ').trim();
+function lev(a,b){if(a===b)return 0;if(!a.length)return b.length;if(!b.length)return a.length;
+  let prev=Array.from({length:b.length+1},(_,i)=>i);
+  for(let i=1;i<=a.length;i++){const cur=[i];for(let j=1;j<=b.length;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));prev=cur}
+  return prev[b.length]}
+function similarClients(name,excludeId){
+  const k=normName(name),l=looseName(name);if(k.length<2)return [];
+  return S.clients.filter(c=>c.id!==excludeId).map(c=>{
+    const ck=normName(c.name),cl=looseName(c.name);let r=0;
+    if(ck&&ck===k)r=3;
+    else if(l&&cl&&l===cl)r=2;
+    else if(Math.max(k.length,ck.length)>=4&&lev(k,ck)<=(Math.max(k.length,ck.length)>=8?2:1))r=1;
+    else if(l&&cl&&Math.max(l.length,cl.length)>=4&&lev(l,cl)<=1)r=1;
+    return r?{c:c,r:r}:null}).filter(Boolean).sort((a,b)=>b.r-a.r||String(a.c.name).localeCompare(String(b.c.name))).slice(0,3).map(x=>x.c);
+}
+function showDup(kind,sims){
+  const slot=$('#dup-slot');if(!slot)return false;
+  const job=kind==='job';
+  slot.innerHTML='<div class="confirm dup"><p><b>Did you mean one of these?</b> '+(job?'Choosing one keeps this customer\'s jobs and what they owe together.':'A similar client is already saved. Two entries for the same garage split its jobs and what it owes.')+'</p>'+
+    sims.map(c=>'<button type="button" class="btn soft" data-act="'+(job?'dup-use':'dup-open')+'" data-v="'+esc(c.id)+'">'+(job?'Yes, use ':'Open ')+esc(c.name)+(c.address?' <span class="note">'+esc(firstLine(c.address))+'</span>':'')+'</button>').join('')+
+    '<button type="button" class="btn ghost" data-act="dup-ack">'+(job?'No, keep it as typed':'No, save as a new client')+'</button></div>';
+  try{slot.scrollIntoView({block:'center',behavior:'smooth'})}catch(e){}
+  return true;
+}
 function showSugg(q){
   const box=$('#f-sugg');if(!box)return;
   const list=S.clients.filter(c=>clientMatch(c,q)).slice(0,6);
@@ -1068,6 +1101,12 @@ async function submitForm(f){
     clientId:v('clientId'),assignee:wid,techId:tech?tech.id:'',techName:tech?tech.name:'',status:old?(old.status||'booked'):'booked',createdAt:old&&old.createdAt?old.createdAt:Date.now(),updatedAt:Date.now()};
   if(data.type==='mobile')data.bay='';
   if(!data.customerName||!data.date||!data.start){toast('Add a customer name, date and start time.');return}
+  if(S.manager&&!data.clientId){
+    const key=normName(data.customerName);const sims=similarClients(data.customerName);
+    const same=sims.filter(c=>normName(c.name)===key);
+    if(same.length===1)data.clientId=same[0].id;   /* same name apart from Ltd, punctuation or case: link it */
+    else if(S.dupAck!==key&&sims.length&&showDup('job',sims))return;
+  }
   if(f.elements.saveClient&&f.elements.saveClient.checked&&!data.clientId){
     const cref=S.db.collection('board/main/clients').doc();
     const okc=await write(()=>cref.set({name:data.customerName.slice(0,80),phone:data.phone,address:data.address,email:'',price:data.price,type:data.type,notes:data.notes,createdAt:Date.now(),updatedAt:Date.now()}));
@@ -1186,6 +1225,7 @@ function renderClientForm(){
   h+='<fieldset><legend>Usual job</legend><div class="grid2"><div class="f"><label for="c-price">Usual price (£)</label><input id="c-price" name="price" class="mono" inputmode="decimal" value="'+(c.price?esc(c.price):'')+'"></div>'+
      '<div class="f"><label for="c-type">Usually</label><select id="c-type" name="type">'+opt('','Either')+opt('unit','At the unit')+opt('mobile','Mobile')+'</select></div></div>'+
      '<div class="f"><label for="c-notes">Notes</label><textarea id="c-notes" name="notes" rows="2" placeholder="Contact name, opening hours, parking">'+esc(c.notes||'')+'</textarea></div></fieldset>';
+  h+='<div id="dup-slot" role="alert"></div>';
   h+='<button type="submit" class="btn pri block">'+(isNew?'Save client':'Save changes')+'</button>';
   if(!isNew){
     if(S.confirmClientDel)h+='<div class="confirm"><p>Delete '+esc(c.name)+' from your clients? Jobs already booked stay as they are.</p><div class="two"><button type="button" class="btn ghost" data-act="client-del-no">Keep</button><button type="button" class="btn danger solid" data-act="client-del-yes">Delete</button></div></div>';
@@ -1197,6 +1237,7 @@ function renderClientForm(){
 async function saveClient(f){
   const v=n=>String(f.elements[n].value||'').trim();
   const name=v('name');if(!name){toast('Add the client\'s name.');f.elements.name.focus();return}
+  if(S.dupAck!==normName(name)){const sims=similarClients(name,S.clientEdit&&S.clientEdit.id);if(sims.length&&showDup('client',sims))return}
   const body={name:name.slice(0,80),phone:v('phone'),email:v('email'),address:v('address'),price:num(v('price')),type:v('type'),notes:v('notes'),updatedAt:Date.now()};
   const c=S.clientEdit;const col=S.db.collection('board/main/clients');
   const ok=await write(()=>c&&c.id?col.doc(c.id).set(Object.assign({createdAt:c.createdAt||Date.now()},body)):col.add(Object.assign({createdAt:Date.now()},body)),c&&c.id?'Client updated':name+' saved to clients');
@@ -1204,8 +1245,8 @@ async function saveClient(f){
   if(c&&c.id){S.clientEdit=null;S.viewClient=c.id;S.sheet='clientview';renderClientView();$('#panel').scrollTop=0}else closeSheet();
 }
 function clientJobs(c){
-  const nmL=String(c.name||'').trim().toLowerCase();
-  return S.jobs.filter(j=>j.clientId===c.id||(!j.clientId&&nmL&&String(j.customerName||'').trim().toLowerCase()===nmL)).sort(byStart).reverse();
+  const nmL=normName(c.name);
+  return S.jobs.filter(j=>j.clientId===c.id||(!j.clientId&&nmL&&normName(j.customerName)===nmL)).sort(byStart).reverse();
 }
 function renderClientView(){
   const c=S.clients.find(x=>x.id===S.viewClient);if(!c){closeSheet();return}
@@ -1556,6 +1597,12 @@ document.addEventListener('click',async ev=>{
   else if(a==='backup'){downloadBackup()}
   else if(a==='import-no'){S.importData=null;render()}
   else if(a==='import-yes'){await runImport()}
+  else if(a==='dup-ack'){const f=$('#clientform')||$('#jobform');const n=$('#c-name')||$('#f-customerName');if(!f||!n)return;S.dupAck=normName(n.value);if(f.requestSubmit)f.requestSubmit();else f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}))}
+  else if(a==='dup-use'){const c=S.clients.find(x=>x.id===v);const f=$('#jobform');if(!c||!f)return;const E=f.elements;
+    E.clientId.value=c.id;E.customerName.value=c.name||'';if(!E.phone.value&&c.phone)E.phone.value=c.phone;if(!E.address.value&&c.address)E.address.value=c.address;
+    $('#f-lookup').innerHTML=lookupHTML(c);const sw=$('#saveclient-wrap');if(sw)sw.hidden=true;E.saveClient.checked=false;
+    if(f.requestSubmit)f.requestSubmit();else f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}))}
+  else if(a==='dup-open'){const c=S.clients.find(x=>x.id===v);if(!c)return;closeSheet();S.viewClient=v;openSheet('clientview');renderClientView()}
   else if(a==='cancel-ask'){S.confirmCancel=true;renderDetail()}
   else if(a==='cancel-no'){S.confirmCancel=false;renderDetail()}
   else if(a==='copymsg'){const j=findJob(S.openKey);if(!j)return;try{await navigator.clipboard.writeText(reminderText(j));toast('Message copied. Paste it into a text or WhatsApp.')}catch(e){toast('Copy failed. Use the Text or WhatsApp button instead.')}}
@@ -1624,6 +1671,7 @@ document.addEventListener('input',async ev=>{
   if(t.id==='f-service')document.querySelectorAll('.preset').forEach(b=>b.classList.toggle('on',b.dataset.v===t.value));
   if(t.form&&t.form.id==='sqform')sqUpdate(t);
   if(t.id==='f-client')showSugg(t.value);
+  if(t.id==='c-name'||t.id==='f-customerName'){const sl=$('#dup-slot');if(sl)sl.innerHTML=''}
   if(t.id==='client-search')renderClients();
   if(t.id==='msg-input'){t.style.height='auto';t.style.height=Math.min(120,t.scrollHeight)+'px'}
   if(t.id==='crew-search'){const hits=await S.user.search(t.value);S.searchHits=hits;const r=$('#results');if(r)r.innerHTML=renderHits()}
