@@ -1242,7 +1242,8 @@ async function saveClient(f){
   const c=S.clientEdit;const col=S.db.collection('board/main/clients');
   const ok=await write(()=>c&&c.id?col.doc(c.id).set(Object.assign({createdAt:c.createdAt||Date.now()},body)):col.add(Object.assign({createdAt:Date.now()},body)),c&&c.id?'Client updated':name+' saved to clients');
   if(!ok)return;
-  if(c&&c.id){S.clientEdit=null;S.viewClient=c.id;S.sheet='clientview';renderClientView();$('#panel').scrollTop=0}else closeSheet();
+  if(c&&c.id){S.clientEdit=null;S.viewClient=c.id;S.sheet='clientview';renderClientView();$('#panel').scrollTop=0}
+  else{S.clientQ='';const qi=$('#client-search');if(qi)qi.value='';closeSheet();render()}   /* new client saved: clear the search text that was carried into it */
 }
 function clientJobs(c){
   const nmL=normName(c.name);
