@@ -272,6 +272,9 @@ legend{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:
 .crew{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
 .crew:last-child{border-bottom:0}
 .crew{flex-wrap:wrap}
+.tlink{display:flex;align-items:center;gap:12px;background:transparent;border:0;padding:0;text-align:left;color:inherit;flex:1 1 200px;min-width:0;cursor:pointer}
+.tlink .nm{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tlink .seejobs{color:var(--accent);font-size:13px;font-weight:600}
 .crew .acts{display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .linkrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%;padding-left:52px}
 .linkrow select{flex:1;min-width:150px;max-width:none}
@@ -977,7 +980,7 @@ window.addEventListener('popstate',()=>{
   syncBackGuard();
 });
 function openSheet(kind){S.sheet=kind;$('#sheet').hidden=false;document.body.style.overflow='hidden';syncBackGuard()}
-function closeSheet(){S.dupAck=null;S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;$('#sheet').hidden=true;syncBackGuard();$('#panel').innerHTML='';document.body.style.overflow=''}
+function closeSheet(){S.dupAck=null;S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;S.sqLock=null;$('#sheet').hidden=true;syncBackGuard();$('#panel').innerHTML='';document.body.style.overflow=''}
 function renderDetail(){
   const j=findJob(S.openKey);
   if(!j){closeSheet();return}
@@ -1177,7 +1180,7 @@ function searchJobs(q){
     if(q.status!=='any'&&st!==q.status)return false;
     if(q.pay==='paid'&&!j.paid)return false;
     if(q.pay==='unpaid'&&(j.paid||st==='cancelled'))return false;
-    if(S.manager&&q.tech!=='all'&&techIdOf(j)!==q.tech)return false;
+    if(S.sqLock){if(techIdOf(j)!==S.sqLock)return false}else if(S.manager&&q.tech!=='all'&&techIdOf(j)!==q.tech)return false;
     if(words.length){
       const hay=[j.customerName,j.reg,String(j.reg||'').replace(/\s/g,''),j.vehicle,j.service,j.address,j.description,j.notes,j.phone,String(j.phone||'').replace(/\s/g,''),jobTechName(j)].join(' ').toLowerCase();
       if(!words.every(w=>hay.includes(w)))return false;
@@ -1188,15 +1191,15 @@ function searchJobs(q){
 function renderSearch(){
   if(!S.sq)S.sq=sqDefaults();const q=S.sq;
   const sel=(id,name,label,opts)=>'<div class="f"><label for="'+id+'">'+label+'</label><select id="'+id+'" name="'+name+'">'+opts.map(o=>'<option value="'+esc(o[0])+'"'+(q[name]===o[0]?' selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></div>';
-  let h='<div class="fhead gut"><div class="inner2"><button type="button" data-act="close" style="color:var(--muted)">Close</button><h2>Find a job</h2><button type="button" data-act="sq-reset" class="save">Clear</button></div></div>';
+  let h='<div class="fhead gut"><div class="inner2"><button type="button" data-act="close" style="color:var(--muted)">'+(S.sqLock?'Team':'Close')+'</button><h2>'+(S.sqLock&&techById(S.sqLock)?esc(techById(S.sqLock).name):'Find a job')+'</h2><button type="button" data-act="sq-reset" class="save">Clear</button></div></div>';
   h+='<form id="sqform" class="jobform gut" novalidate>'+
-    '<div class="f"><label for="sq-text">Search</label><input id="sq-text" name="text" type="search" autocomplete="off" placeholder="Customer, reg, vehicle, garage or notes" value="'+esc(q.text)+'"></div>'+
+    '<div class="f"><label for="sq-text">Search</label><input id="sq-text" name="text" type="search" autocomplete="off" placeholder="'+(S.sqLock?'Search this technician\'s jobs':'Customer, reg, vehicle, garage or notes')+'" value="'+esc(q.text)+'"></div>'+
     '<div class="grid2">'+sel('sq-when','when','When',[['any','Any time'],['today','Today'],['upcoming','Today onwards'],['week','This week'],['lastweek','Last week'],['month','This month'],['lastmonth','Last month'],['last30','Last 30 days'],['custom','Choose dates']])+
       sel('sq-type','type','Job type',[['all','Unit and mobile'],['unit','Unit only'],['mobile','Mobile only']])+'</div>'+
     '<div class="grid2" id="sq-custom"'+(q.when==='custom'?'':' hidden')+'><div class="f"><label for="sq-from">From</label><input type="date" id="sq-from" name="from" value="'+esc(q.from)+'"></div><div class="f"><label for="sq-to">To</label><input type="date" id="sq-to" name="to" value="'+esc(q.to)+'"></div></div>'+
     '<div class="grid2">'+sel('sq-status','status','Status',[['any','Any status'],['booked','Booked'],['in_progress','In progress'],['done','Done'],['cancelled','Cancelled']])+
       sel('sq-pay','pay','Payment',[['any','Paid or unpaid'],['unpaid','Unpaid'],['paid','Paid']])+'</div>'+
-    (S.manager?sel('sq-tech','tech','Technician',[['all','All technicians']].concat(S.techs.map(t=>[t.id,t.name])).concat([['','Needs a technician']])):'')+
+    (S.manager&&!S.sqLock?sel('sq-tech','tech','Technician',[['all','All technicians']].concat(S.techs.map(t=>[t.id,t.name])).concat([['','Needs a technician']])):'')+
     '</form><div class="gut srres" id="sr-results" aria-live="polite"></div>';
   $('#panel').innerHTML=h;$('#panel').scrollTop=0;
   renderSearchResults();
@@ -1397,7 +1400,7 @@ function renderTeam(){
     }else{
       act=(t.uid?(FEATURE_MESSAGING?'<button class="btn ghost sm" data-act="thread" data-v="dm:'+esc(t.uid)+'">Message</button>':'')+'<button class="btn ghost sm" data-act="unlink" data-v="'+esc(t.id)+'">Unlink app</button>':'')+'<button class="btn ghost sm" data-act="tech-email" data-v="'+esc(t.id)+'">'+(t.email?'Change email':'Give app access')+'</button><button class="btn danger sm" data-act="tech-rm" data-v="'+esc(t.id)+'">Remove</button>';
     }
-    return '<div class="crew">'+techAv(t,'lg')+'<span class="nm"><b>'+esc(t.name)+'</b><span>'+sub+'</span></span><span class="acts">'+act+'</span>'+(S.editEmail===t.id?'<div class="linkrow"><label for="te-input" class="sr">Email for '+esc(t.name)+'</label><input id="te-input" type="email" class="csearch" value="'+esc(t.email||'')+'" placeholder="name@example.com" autocomplete="off"><button class="btn soft sm" data-act="tech-email-save" data-v="'+esc(t.id)+'">Save</button><button class="btn ghost sm" data-act="tech-email-cancel">Cancel</button></div>':'')+'</div>'}).join('')+'</div>';
+    return '<div class="crew"><button class="tlink" data-act="tech-jobs" data-v="'+esc(t.id)+'" aria-label="See '+esc(t.name)+'\'s jobs">'+techAv(t,'lg')+'<span class="nm"><b>'+esc(t.name)+'</b><span>'+sub+'</span><span class="seejobs">See jobs ›</span></span></button><span class="acts">'+act+'</span>'+(S.editEmail===t.id?'<div class="linkrow"><label for="te-input" class="sr">Email for '+esc(t.name)+'</label><input id="te-input" type="email" class="csearch" value="'+esc(t.email||'')+'" placeholder="name@example.com" autocomplete="off"><button class="btn soft sm" data-act="tech-email-save" data-v="'+esc(t.id)+'">Save</button><button class="btn ghost sm" data-act="tech-email-cancel">Cancel</button></div>':'')+'</div>'}).join('')+'</div>';
   const free=S.techs.filter(t=>!t.uid);
   const waiting=S.crew.filter(c=>!techByUid(c.id));
   h+='<h2 class="subh">Give a technician the app</h2><div class="box"><p class="note">Optional. Technicians on the app see only their own jobs, update them and message you. Others can still be booked; you pass the details on yourself.</p><ol class="steps"><li>Tap <b>Give app access</b> next to their name and enter the email they\'ll sign in with.</li><li>Send them this app\'s link.</li><li>They sign in with Google, or with an emailed link, using that email.</li><li>They\'re linked to their name automatically and their jobs move across.</li></ol></div>';
@@ -1596,7 +1599,7 @@ document.addEventListener('click',async ev=>{
   else if(a==='type'){S.type=v;render()}
   else if(a==='open'){if(!findJob(v)){toast('That job is no longer on your list.');return}const rc=(S.sheet==='clientview')?S.viewClient:null;const rs=S.sheet==='search'||(S.sheet==='detail'&&S.returnSearch);S.viewClient=null;S.returnClient=rc;S.returnSearch=rs;S.openKey=v;S.confirmDel=false;S.confirmCancel=false;openSheet('detail');renderDetail();$('#panel').scrollTop=0}
   else if(a==='close'){
-    if(S.sheet==='detail'&&S.returnSearch){closeSheet();openSheet('search');renderSearch();return}
+    if(S.sheet==='detail'&&S.returnSearch){const lk=S.sqLock;closeSheet();S.sqLock=lk;openSheet('search');renderSearch();return}
     if(S.sheet==='detail'&&S.returnClient){const id=S.returnClient;closeSheet();S.viewClient=id;openSheet('clientview');renderClientView();return}
     closeSheet()}
   else if(a==='new-job'){S.editing=null;openSheet('form');renderForm()}
@@ -1659,7 +1662,8 @@ document.addEventListener('click',async ev=>{
   else if(a==='client-del-yes'){const c=S.clientEdit;if(!c)return;const ok=await write(()=>S.db.doc('board/main/clients/'+c.id).delete(),c.name+' deleted');if(ok)closeSheet()}
   else if(a==='pick-client'){const c=S.clients.find(x=>x.id===v);if(c)fillFromClient(c)}
   else if(a==='unpick-client'){const f=$('#jobform');if(!f)return;f.elements.clientId.value='';$('#f-lookup').innerHTML=lookupHTML(null);$('#saveclient-wrap').hidden=false;const s=$('#f-client');if(s){s.focus();showSugg('')}}
-  else if(a==='search'){openSheet('search');renderSearch();const s=$('#sq-text');if(s)s.focus()}
+  else if(a==='tech-jobs'){S.sqLock=v;S.sq=sqDefaults();S.sq.when='upcoming';openSheet('search');renderSearch()}
+  else if(a==='search'){S.sqLock=null;openSheet('search');renderSearch();const s=$('#sq-text');if(s)s.focus()}
   else if(a==='sq-reset'){S.sq=sqDefaults();renderSearch();const s=$('#sq-text');if(s)s.focus()}
   else if(a==='board-open'){if(!FEATURE_UNIT_SCREEN)return;location.hash='board';if(location.hash!=='#board')setBoard(true)}
   else if(a==='board-priv'){store('board:private',store('board:private')==='1'?'0':'1');renderBoard()}
