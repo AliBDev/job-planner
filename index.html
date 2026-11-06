@@ -955,8 +955,29 @@ function workloadHTML(){
 
 /* ---------- day rollover ---------- */
 function checkDay(){const t=today();if(S.lastToday!==t){if(S.day===S.lastToday){S.day=t;S.centerDay=true}S.lastToday=t;if(S.ready)render()}}
-function openSheet(kind){S.sheet=kind;$('#sheet').hidden=false;document.body.style.overflow='hidden'}
-function closeSheet(){S.dupAck=null;S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;$('#sheet').hidden=true;$('#panel').innerHTML='';document.body.style.overflow=''}
+/* Phone back button: step back inside the app instead of leaving it.
+   While the app is one step deep (a sheet is open, or a tab other than Schedule), one extra history entry sits on top;
+   Back removes it and undoes that step. When the app is back at the start the entry is removed again. */
+let backGuard=false,backIgnore=0;
+const needBackGuard=()=>!!S.sheet||(S.mode!=='board'&&S.tab!=='schedule');
+function syncBackGuard(){
+  try{
+    const need=needBackGuard();
+    if(need&&!backGuard){history.pushState({crGuard:1},'',location.href);backGuard=true}
+    else if(!need&&backGuard){backGuard=false;backIgnore++;history.back()}
+  }catch(e){}
+}
+window.addEventListener('popstate',()=>{
+  if(backIgnore>0){backIgnore--;return}
+  backGuard=false;
+  if(S.sheet){
+    const b=$('#panel [data-act="close"],#panel [data-act="client-back"],#panel [data-act="back-detail"]')||$('.sheet-back');
+    if(b)b.click();else closeSheet();
+  }else if(S.tab!=='schedule'){S.tab='schedule';S.thread=null;render();window.scrollTo(0,0)}
+  syncBackGuard();
+});
+function openSheet(kind){S.sheet=kind;$('#sheet').hidden=false;document.body.style.overflow='hidden';syncBackGuard()}
+function closeSheet(){S.dupAck=null;S.sheet=null;S.openKey=null;S.confirmCancel=false;S.editing=null;S.confirmDel=false;S.clientEdit=null;S.confirmClientDel=false;S.prefill=null;S.viewClient=null;S.returnClient=null;S.cvFilter='all';S.returnSearch=false;$('#sheet').hidden=true;syncBackGuard();$('#panel').innerHTML='';document.body.style.overflow=''}
 function renderDetail(){
   const j=findJob(S.openKey);
   if(!j){closeSheet();return}
@@ -1568,7 +1589,7 @@ window.addEventListener('online',()=>{setTimeout(()=>{S.offline=false;if(S.ready
 document.addEventListener('click',async ev=>{
   const el=ev.target.closest('[data-act]');if(!el)return;
   const a=el.dataset.act,v=el.dataset.v;
-  if(a==='tab'){S.tab=v;S.thread=null;closeSheet();render();window.scrollTo(0,0)}
+  if(a==='tab'){S.tab=v;S.thread=null;closeSheet();render();window.scrollTo(0,0);syncBackGuard()}
   else if(a==='day'){S.day=v;render()}
   else if(a==='week'){S.day=addDays(S.day,Number(v));S.centerDay=true;render()}
   else if(a==='today'){S.day=today();S.centerDay=true;render()}
