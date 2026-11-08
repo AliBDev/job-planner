@@ -5,4 +5,5 @@ compatibility_date = "2024-11-01"
 [vars]
 FIREBASE_PROJECT_ID = "custom-remaps-planner"
 ALLOWED_ORIGIN = "https://alibdev.github.io"
-# DVLA_API_KEY is a secret: set it with `npx wrangler secret put DVLA_API_KEY` (never put it in this file)
+# Secrets (never put them in this file): DVSA_TOKEN_URL, DVSA_CLIENT_ID, DVSA_CLIENT_SECRET, DVSA_API_KEY
+# Set each with `npx wrangler secret put <NAME>`

@@ -1130,11 +1130,11 @@ async function regLookup(){
     const r=await fetch(DVLA_LOOKUP_URL,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({reg:reg})});
     const d=await r.json().catch(()=>({}));
     if(!$('#reg-msg'))return;   /* form was closed while waiting */
-    if(!r.ok){msg.textContent=r.status===404?'DVLA has no vehicle with that reg.':r.status===400?'That does not look like a valid reg.':r.status===429?'DVLA is busy, try again in a minute.':r.status===401?'Sign in again, then retry.':'Lookup failed. Fill it in by hand.';return}
-    const make=titleCase(d.make);const v=f.elements.vehicle;
-    const bits=[make,titleCase(d.colour),d.year,titleCase(d.fuel),d.cc?d.cc+'cc':''].filter(Boolean).join(', ');
+    if(!r.ok){msg.textContent=r.status===404?'No vehicle found for that reg.':r.status===400?'That does not look like a valid reg.':r.status===429?'The lookup is busy, try again in a minute.':r.status===401?'Sign in again, then retry.':'Lookup failed. Fill it in by hand.';return}
+    const make=titleCase(d.make),model=titleCase(d.model);const v=f.elements.vehicle;
+    const bits=[make,model,titleCase(d.colour),d.year,titleCase(d.fuel),d.cc?d.cc+'cc':''].filter(Boolean).join(', ');
     const mot=d.motExpiry?' MOT to '+d.motExpiry+'.':(d.motStatus?' MOT: '+d.motStatus+'.':'');
-    if(!v.value.trim()&&make){v.value=make+' ';v.focus();v.setSelectionRange(v.value.length,v.value.length);msg.textContent=bits+'.'+mot+' Add the model.'}
+    if(!v.value.trim()&&make){v.value=(make+' '+model).trim()+(model?'':' ');v.focus();v.setSelectionRange(v.value.length,v.value.length);msg.textContent=bits+'.'+mot+(model?'':' Add the model.')}
     else msg.textContent=bits+'.'+mot;
   }catch(e){if($('#reg-msg'))msg.textContent='Could not reach the lookup. Fill it in by hand.'}
   finally{const b=$('#reglook');if(b)b.disabled=false}
