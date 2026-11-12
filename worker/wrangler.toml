@@ -5,5 +5,11 @@ compatibility_date = "2024-11-01"
 [vars]
 FIREBASE_PROJECT_ID = "custom-remaps-planner"
 ALLOWED_ORIGIN = "https://alibdev.github.io"
+# Registration used by the monthly keep-alive call (any real UK reg works; a 'not found' reply still counts as use)
+KEEPALIVE_REG = "AB12CDE"
+
+# Monthly keep-alive so DVSA never revokes the key for 90 days of non-use (1st of each month, 06:17 UTC)
+[triggers]
+crons = ["17 6 1 * *"]
 # Secrets (never put them in this file): DVSA_TOKEN_URL, DVSA_CLIENT_ID, DVSA_CLIENT_SECRET, DVSA_API_KEY
 # Set each with `npx wrangler secret put <NAME>`

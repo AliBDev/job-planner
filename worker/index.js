@@ -75,7 +75,25 @@ export function mapVehicle(raw, reg) {
 
 const normReg = r => String(r || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
+/* Monthly keep-alive: DVSA revokes an API key that goes unused for 90 days, so the Worker makes one lookup itself on a timer.
+   A 200 or 404 both mean DVSA accepted the credentials; anything else is logged as an error (visible in Cloudflare > Workers > Logs). */
+export async function keepAlive(env, fetchFn = fetch) {
+  const reg = normReg(env.KEEPALIVE_REG) || 'AB12CDE';
+  try {
+    let tok = await dvsaToken(env, fetchFn, false);
+    let r = await dvsaGet(reg, env, fetchFn, tok);
+    if (r.status === 401) { tok = await dvsaToken(env, fetchFn, true); r = await dvsaGet(reg, env, fetchFn, tok); }
+    const good = r.status === 200 || r.status === 404;
+    (good ? console.log : console.error)('keepalive ' + (good ? 'ok' : 'FAILED') + ' status=' + r.status);
+    return good;
+  } catch (e) {
+    console.error('keepalive FAILED ' + (e && e.message));
+    return false;
+  }
+}
+
 export default {
+  async scheduled(event, env, ctx, fetchFn = fetch) { await keepAlive(env, fetchFn); },
   async fetch(request, env, ctx, fetchFn = fetch) {
     const allowed = String(env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
     const origin = request.headers.get('Origin') || '';
