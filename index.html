@@ -60,6 +60,11 @@
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--head)}
 button,input,select,textarea{font:inherit;color:inherit}
+input:not([type]),input[type=text],input[type=search],input[type=tel],input[type=email],input[type=number],textarea{padding-right:38px}
+input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+#clearx{position:fixed;z-index:50;width:30px;height:30px;padding:0;border:0;border-radius:50%;background:var(--seg);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
+#clearx[hidden]{display:none}
+#clearx svg{width:14px;height:14px;pointer-events:none}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -1728,10 +1733,39 @@ document.addEventListener('input',async ev=>{
   if(t.id==='msg-input'){t.style.height='auto';t.style.height=Math.min(120,t.scrollHeight)+'px'}
   if(t.id==='crew-search'){const hits=await S.user.search(t.value);S.searchHits=hits;const r=$('#results');if(r)r.innerHTML=renderHits()}
 });
+/* "x" button that clears the text field you are typing in */
+const CLEARABLE='input:not([type]),input[type=text],input[type=search],input[type=tel],input[type=email],input[type=number],textarea';
+let clrEl=null;
+const clrBtn=document.createElement('button');
+clrBtn.type='button';clrBtn.id='clearx';clrBtn.hidden=true;clrBtn.setAttribute('aria-label','Clear this field');
+clrBtn.innerHTML='<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"/></svg>';
+document.body.appendChild(clrBtn);
+function clrPlace(){
+  const e=clrEl;
+  if(!e||!e.isConnected||e.readOnly||e.disabled||!e.value||document.activeElement!==e){clrBtn.hidden=true;return}
+  const r=e.getBoundingClientRect();const pn=e.closest('#panel');const pr=pn?pn.getBoundingClientRect():null;
+  if(!r.width||r.bottom<0||r.top>innerHeight||(pr&&(r.top<pr.top||r.bottom>pr.bottom))){clrBtn.hidden=true;return}
+  clrBtn.style.left=(r.right-36)+'px';
+  clrBtn.style.top=(e.tagName==='TEXTAREA'?r.top+6:r.top+(r.height-30)/2)+'px';
+  clrBtn.hidden=false;
+}
+document.addEventListener('focusin',ev=>{const t=ev.target;clrEl=t.matches&&t.matches(CLEARABLE)?t:null;clrPlace()});
+document.addEventListener('focusout',()=>{setTimeout(()=>{if(!clrEl||document.activeElement!==clrEl)clrBtn.hidden=true},250)});
+document.addEventListener('input',()=>clrPlace());
+document.addEventListener('scroll',()=>{if(!clrBtn.hidden)clrPlace()},true);
+window.addEventListener('resize',()=>clrPlace());
+if(window.visualViewport)window.visualViewport.addEventListener('resize',()=>clrPlace());
+clrBtn.addEventListener('pointerdown',ev=>ev.preventDefault());
+clrBtn.addEventListener('mousedown',ev=>ev.preventDefault());
+clrBtn.addEventListener('click',()=>{
+  const e=clrEl;if(!e)return;
+  e.value='';e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));
+  e.focus();clrPlace();
+});
 /* The saved-client list closes as soon as you move to another field or tap elsewhere */
 const hideSugg=()=>{const b=$('#f-sugg');if(b&&b.innerHTML)b.innerHTML=''};
 document.addEventListener('focusin',ev=>{const t=ev.target;if(t.id==='f-client')showSugg(t.value);else if(!(t.closest&&t.closest('#f-lookup')))hideSugg()});
-document.addEventListener('pointerdown',ev=>{const t=ev.target;if(!(t.closest&&t.closest('#f-lookup')))hideSugg()});
+document.addEventListener('pointerdown',ev=>{const t=ev.target;if(!(t.closest&&t.closest('#f-lookup,#clearx')))hideSugg()});
 document.addEventListener('focusin',async ev=>{if(ev.target.id==='crew-search'&&!ev.target.value&&S.user){S.searchHits=await S.user.search('');const r=$('#results');if(r)r.innerHTML=renderHits()}});
 document.addEventListener('submit',ev=>{
   ev.preventDefault();
