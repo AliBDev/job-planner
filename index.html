@@ -1687,7 +1687,7 @@ document.addEventListener('click',async ev=>{
   else if(a==='client-del-no'){S.confirmClientDel=false;renderClientForm()}
   else if(a==='client-del-yes'){const c=S.clientEdit;if(!c)return;const ok=await write(()=>S.db.doc('board/main/clients/'+c.id).delete(),c.name+' deleted');if(ok)closeSheet()}
   else if(a==='pick-client'){const c=S.clients.find(x=>x.id===v);if(c)fillFromClient(c)}
-  else if(a==='unpick-client'){const f=$('#jobform');if(!f)return;f.elements.clientId.value='';$('#f-lookup').innerHTML=lookupHTML(null);$('#saveclient-wrap').hidden=false;const s=$('#f-client');if(s){s.focus();showSugg('')}}
+  else if(a==='unpick-client'){const f=$('#jobform');if(!f)return;f.elements.clientId.value='';$('#f-lookup').innerHTML=lookupHTML(null);$('#saveclient-wrap').hidden=false;f.elements.customerName.value='';f.elements.address.value='';const sl=$('#dup-slot');if(sl)sl.innerHTML='';f.elements.customerName.focus()}
   else if(a==='tech-jobs'){S.sqLock=v;S.sq=sqDefaults();S.sq.when='upcoming';openSheet('search');renderSearch()}
   else if(a==='search'){S.sqLock=null;openSheet('search');renderSearch();const s=$('#sq-text');if(s)s.focus()}
   else if(a==='sq-reset'){S.sq=sqDefaults();renderSearch();const s=$('#sq-text');if(s)s.focus()}
