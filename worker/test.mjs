@@ -1,4 +1,4 @@
-import worker, { verifyFirebaseToken, mapVehicle } from './index.js';
+import worker, { verifyFirebaseToken, mapVehicle, keepAlive } from './index.js';
 import { webcrypto } from 'node:crypto';
 const PID = 'custom-remaps-planner';
 const kp = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1,0,1]), hash: 'SHA-256' }, true, ['sign','verify']);
@@ -45,4 +45,10 @@ ok((await run(req(await token(), { reg: 'NOPE1' }))).status === 404, 'unknown re
 ok((await run(req(null, null, 'https://alibdev.github.io', 'OPTIONS'))).status === 204, 'preflight 204');
 ok((await run(req(null, null, 'https://alibdev.github.io', 'GET'))).status === 405, 'GET -> 405');
 const mv = mapVehicle([{ registration: 'X', make: 'FORD', model: 'FOCUS', primaryColour: 'Blue', fuelType: 'Diesel', engineSize: 1560, registrationDate: '2015-06-02', motTestDueDate: '2027-06-01' }], 'X'); ok(mv.model === 'FOCUS' && mv.year === 2015 && mv.motExpiry === '2027-06-01', 'tolerant mapping handles array + alternative field names');
+const before = dvlaCalls.length;
+ok(await keepAlive(env, fakeFetch) === true && dvlaCalls.length === before + 1 && dvlaCalls[before].url.endsWith('/registration/AB12CDE'), 'keep-alive makes one DVSA lookup');
+ok(await keepAlive(Object.assign({}, env, { KEEPALIVE_REG: 'NOPE1' }), fakeFetch) === true, 'keep-alive treats not-found as success (key accepted)');
+ok(await keepAlive(env, async () => new Response('x', { status: 500 })) === false, 'keep-alive reports failure on server error');
+ok(await keepAlive(env, async () => { throw new Error('net'); }) === false, 'keep-alive does not throw on network failure');
+const b2 = dvlaCalls.length; await worker.scheduled({ cron: '17 6 1 * *' }, env, {}, fakeFetch); ok(dvlaCalls.length === b2 + 1, 'scheduled handler runs the keep-alive lookup');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
