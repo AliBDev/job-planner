@@ -1728,7 +1728,10 @@ document.addEventListener('input',async ev=>{
   if(t.id==='msg-input'){t.style.height='auto';t.style.height=Math.min(120,t.scrollHeight)+'px'}
   if(t.id==='crew-search'){const hits=await S.user.search(t.value);S.searchHits=hits;const r=$('#results');if(r)r.innerHTML=renderHits()}
 });
-document.addEventListener('focusin',ev=>{if(ev.target.id==='f-client')showSugg(ev.target.value)});
+/* The saved-client list closes as soon as you move to another field or tap elsewhere */
+const hideSugg=()=>{const b=$('#f-sugg');if(b&&b.innerHTML)b.innerHTML=''};
+document.addEventListener('focusin',ev=>{const t=ev.target;if(t.id==='f-client')showSugg(t.value);else if(!(t.closest&&t.closest('#f-lookup')))hideSugg()});
+document.addEventListener('pointerdown',ev=>{const t=ev.target;if(!(t.closest&&t.closest('#f-lookup')))hideSugg()});
 document.addEventListener('focusin',async ev=>{if(ev.target.id==='crew-search'&&!ev.target.value&&S.user){S.searchHits=await S.user.search('');const r=$('#results');if(r)r.innerHTML=renderHits()}});
 document.addEventListener('submit',ev=>{
   ev.preventDefault();
