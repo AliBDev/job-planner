@@ -1057,7 +1057,7 @@ function renderForm(){
      '<input type="hidden" id="f-bay" name="bay" value="'+esc(j.bay||'')+'"></fieldset>';
   h+='<div class="banner" id="f-clash" role="status" hidden></div>';
   h+='<fieldset><legend>Customer and vehicle</legend><input type="hidden" name="clientId" id="f-clientId" value="'+esc(linkedC?linkedC.id:'')+'"><div id="f-lookup">'+lookupHTML(linkedC)+'</div><div class="f"><label for="f-customerName">Customer name</label><input id="f-customerName" name="customerName" value="'+esc(j.customerName||'')+'" autocomplete="off" required></div>'+
-     '<div class="f"><label for="f-address" id="addr-label">'+(mob?'Garage and address':'Customer address (optional)')+'</label><textarea id="f-address" name="address" rows="2">'+esc(j.address||'')+'</textarea></div>'+
+     '<div class="f" id="addr-wrap"'+(mob?'':' hidden')+'><label for="f-address" id="addr-label">'+(mob?'Garage and address':'Customer address (optional)')+'</label><textarea id="f-address" name="address" rows="2">'+esc(j.address||'')+'</textarea></div>'+
      '<div class="f"><label for="f-phone">Phone</label><input id="f-phone" name="phone" type="tel" class="mono" value="'+esc(j.phone||'')+'" autocomplete="off"></div>'+
      '<div class="regrow"><div class="f"><label for="f-reg">Reg</label><input id="f-reg" name="reg" class="regin" value="'+esc(j.reg||'')+'" autocomplete="off" autocapitalize="characters"></div><div class="f"><label for="f-vehicle">Make and model</label><input id="f-vehicle" name="vehicle" value="'+esc(j.vehicle||'')+'" autocomplete="off"></div></div>'+(DVLA_LOOKUP_URL?'<div class="reglook"><button type="button" class="btn soft sm" id="reglook" data-act="reg-lookup">Look up reg</button><p class="note" id="reg-msg" role="status" aria-live="polite"></p></div>':'')+
      '<label class="check" for="f-saveclient" id="saveclient-wrap"'+(linkedC||!S.manager?' hidden':'')+'><input type="checkbox" id="f-saveclient" name="saveClient">Save to my client list</label></fieldset>';
@@ -1110,7 +1110,7 @@ function showSugg(q){
   const list=S.clients.filter(c=>clientMatch(c,q)).slice(0,6);
   box.innerHTML=list.length?list.map(c=>'<button type="button" data-act="pick-client" data-v="'+esc(c.id)+'"><span class="sn"><b>'+esc(c.name)+'</b><span>'+esc([firstLine(c.address),c.phone].filter(Boolean).join(' · '))+'</span></span>'+(c.price?'<span class="price">'+money(c.price)+'</span>':'')+'</button>').join(''):(q?'<span class="note">No saved client matches. Fill in the details below.</span>':'');
 }
-function applyType(mob){const b=$('#bay-wrap');if(b)b.hidden=mob;const l=$('#addr-label');if(l)l.textContent=mob?'Garage and address':'Customer address (optional)'}
+function applyType(mob){const b=$('#bay-wrap');if(b)b.hidden=mob;const aw=$('#addr-wrap');if(aw)aw.hidden=!mob;const l=$('#addr-label');if(l)l.textContent=mob?'Garage and address':'Customer address (optional)'}
 function fillFromClient(c){
   const f=$('#jobform');if(!f)return;const E=f.elements;
   E.customerName.value=c.name||'';E.phone.value=c.phone||'';E.address.value=c.address||'';
@@ -1145,7 +1145,7 @@ async function submitForm(f){
   const old=S.editing;
   const techId=v('assignee');const tech=techById(techId);const wid=S.manager?((tech&&tech.uid)||''):S.me;
   const data={type:f.elements.type.value==='mobile'?'mobile':'unit',date:v('date'),start:v('start'),duration:Number(v('duration'))||60,
-    bay:v('bay'),address:v('address'),customerName:v('customerName'),phone:v('phone'),reg:v('reg').toUpperCase(),vehicle:v('vehicle'),
+    bay:v('bay'),address:(f.elements.type.value!=='mobile'&&!old)?'':v('address'),customerName:v('customerName'),phone:v('phone'),reg:v('reg').toUpperCase(),vehicle:v('vehicle'),
     service:v('service'),description:v('description'),price:num(v('price')),deposit:num(v('deposit')),paid:f.elements.paid.value==='yes',notes:v('notes'),
     clientId:v('clientId'),assignee:wid,techId:tech?tech.id:'',techName:tech?tech.name:'',status:old?(old.status||'booked'):'booked',createdAt:old&&old.createdAt?old.createdAt:Date.now(),updatedAt:Date.now()};
   if(data.type==='mobile')data.bay='';
