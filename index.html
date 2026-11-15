@@ -1615,6 +1615,10 @@ function setBoard(on){
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){checkDay();wake()}});
 setInterval(checkDay,60000);
 window.addEventListener('hashchange',()=>{if(S.ready)setBoard(location.hash==='#board')});
+/* the unit screen's date field is picker-only: a click anywhere on it opens the calendar, and typing into the DD/MM/YYYY parts is blocked */
+document.addEventListener('click',ev=>{const t=ev.target;if(t&&t.id==='b-date'){try{t.showPicker()}catch(e){}}});
+document.addEventListener('keydown',ev=>{const t=ev.target;if(!t||t.id!=='b-date'||ev.key==='Tab'||ev.key==='Escape')return;
+  ev.preventDefault();if(ev.key==='Enter'||ev.key===' '||ev.key==='ArrowDown'){try{t.showPicker()}catch(e){}}});
 document.addEventListener('focusout',ev=>{if(ev.target&&ev.target.id==='b-date'&&S.ready&&S.mode==='board')setTimeout(renderBoard,0)});
 setInterval(()=>{
   if(!S.ready||S.mode!=='board')return;
