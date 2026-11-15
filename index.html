@@ -1545,10 +1545,10 @@ function boardMark(list){
     S.bSeen[k]=u});
   Object.keys(S.bFresh).forEach(k=>{if(now-S.bFresh[k].at>90000)delete S.bFresh[k]});
 }
-function renderBoard(){
+function renderBoard(force){
   const el=$('#board');
   if(!S.manager){el.innerHTML='<div class="b-msg"><h1>Unit screen</h1><p>This screen shows every unit job, so it needs to be signed in with the Manager\'s account.</p><button class="b-btn" data-act="board-exit">Back to the app</button></div>';return}
-  if(el.contains(document.activeElement)&&document.activeElement.id==='b-date')return; /* don't close the date picker while it's open */
+  if(!force&&el.contains(document.activeElement)&&document.activeElement.id==='b-date')return; /* don't close the date picker while it's open */
   const now=new Date();const nowM=now.getHours()*60+now.getMinutes();const t0=today();S.bMin=nowM;
   if(S.bDate&&S.bDate===t0)S.bDate=null;
   const t=S.bDate||t0,isToday=t===t0; /* t is the day on show; t0 is the real today */
@@ -1737,7 +1737,7 @@ document.addEventListener('change',ev=>{
   const t=ev.target;
   if(t.id==='worker-filter'){S.worker=t.value;render()}
   if(t.id==='import-file'&&t.files&&t.files[0]){readImport(t.files[0]);t.value=''}
-  if(t.id==='b-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.bTouch=Date.now();S.bDate=t.value===today()?null:t.value;S.bFresh={};t.blur();renderBoard()}
+  if(t.id==='b-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.bTouch=Date.now();S.bDate=t.value===today()?null:t.value;S.bFresh={};renderBoard(true)}
   if(t.id==='goto-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.day=t.value;S.centerDay=true;render()}
   if(t.form&&t.form.id==='sqform')sqUpdate(t);
   if(t.name==='type'&&t.form&&t.form.id==='jobform')applyType(t.value==='mobile');
