@@ -1584,7 +1584,7 @@ function renderBoard(force){
       (list.length?(more?'<div class="b-more">+'+more+' earlier</div>':'')+shown.map(j=>card(j,kind,list.length>4)).join(''):'<div class="b-empty">'+esc(empty)+'</div>')+'</div></section>'};
   const mobHTML=mob.length?'<section class="b-mob" aria-label="Mobile jobs"><span class="b-mobh">'+(isToday?'Mobile today':'Mobile · '+esc(shortDay(t)))+'</span>'+mob.map(j=>{
       const s=j.status||'booked';const tn=jobTechName(j);const f=fresh(j);
-      const where=firstLine(j.address)||(priv?'Mobile job':(j.customerName||'Mobile job'));
+      const where=priv?'Mobile job':(j.customerName||'Mobile job'); /* the client's name, not the address */
       return '<span class="b-mchip s-'+esc(s)+(f?' b-new':'')+'"><b>'+esc(j.start||'')+'</b> '+esc(where)+(j.reg?' <span class="b-mreg">'+esc(j.reg)+'</span>':'')+' · '+esc(tn||'No technician')+' · '+esc(STATUS[s]||'Booked')+'</span>'}).join('')+'</section>':'';
   const tf=tmrList[0];
   const tmrTxt=(isToday?'Tomorrow':esc(shortDay(addDays(t,1))))+': '+tmrList.length+(tmrList.length===1?' unit job':' unit jobs')+(tf?' · first at '+esc(tf.start||'')+(tf.reg?' · '+esc(tf.reg):'')+(tf.vehicle?' '+esc(tf.vehicle):''):'');
