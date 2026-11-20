@@ -1065,7 +1065,7 @@ function renderForm(){
      '<div class="grid2"><div class="f"><label for="f-duration">Length</label><select id="f-duration" name="duration">'+durOpts+'</select></div>'+(S.manager?'<div class="f"><label for="f-assignee">Technician</label><select id="f-assignee" name="assignee">'+crewOpts+'</select>'+(S.techs.length?'':'<span class="note" style="font-size:12px">Add technicians in the Team tab.</span>')+'</div>':'<div class="f"><span class="lab" style="padding-top:2px">Technician</span><input type="hidden" name="assignee" value=""><span style="padding:11px 0;font-weight:600">You</span></div>')+'</div>'+
      '<input type="hidden" id="f-bay" name="bay" value="'+esc(j.bay||'')+'"></fieldset>';
   h+='<div class="banner" id="f-clash" role="status" hidden></div>';
-  h+='<fieldset><legend>Customer and vehicle</legend><input type="hidden" name="clientId" id="f-clientId" value="'+esc(linkedC?linkedC.id:'')+'"><div id="f-lookup">'+lookupHTML(linkedC)+'</div><div class="f"><label for="f-customerName">Customer name</label><input id="f-customerName" name="customerName" value="'+esc(j.customerName||'')+'" autocomplete="off" required></div>'+
+  h+='<fieldset><legend>Customer and vehicle</legend><input type="hidden" name="clientId" id="f-clientId" value="'+esc(linkedC?linkedC.id:'')+'"><div id="f-lookup">'+lookupHTML(linkedC)+'</div><div class="f"><label for="f-customerName">Customer name</label><input id="f-customerName" name="customerName" autocapitalize="words" value="'+esc(j.customerName||'')+'" autocomplete="off" required></div>'+
      '<div class="f" id="addr-wrap"'+(mob?'':' hidden')+'><label for="f-address" id="addr-label">'+(mob?'Garage and address':'Customer address (optional)')+'</label><textarea id="f-address" name="address" rows="2">'+esc(j.address||'')+'</textarea></div>'+
      '<div class="f"><label for="f-phone">Phone</label><input id="f-phone" name="phone" type="tel" class="mono" value="'+esc(j.phone||'')+'" autocomplete="off"></div>'+
      '<div class="regrow"><div class="f"><label for="f-reg">Reg</label><input id="f-reg" name="reg" class="regin" value="'+esc(j.reg||'')+'" autocomplete="off" autocapitalize="characters"></div><div class="f"><label for="f-vehicle">Make and model</label><input id="f-vehicle" name="vehicle" value="'+esc(j.vehicle||'')+'" autocomplete="off"></div></div>'+(DVLA_LOOKUP_URL?'<div class="reglook"><button type="button" class="btn soft sm" id="reglook" data-act="reg-lookup">Look up reg</button><p class="note" id="reg-msg" role="status" aria-live="polite"></p></div>':'')+
@@ -1083,7 +1083,7 @@ function renderForm(){
 function lookupHTML(c){
   if(c)return '<div class="linked"><span>Saved client: <b>'+esc(c.name)+'</b></span><button type="button" data-act="unpick-client">Change</button></div>';
   if(!S.clients.length)return '';
-  return '<div class="f"><label for="f-client">Find a saved client</label><input id="f-client" type="search" autocomplete="off" placeholder="Start typing a name"><div class="sugg" id="f-sugg"></div></div>';
+  return '<div class="f"><label for="f-client">Find a saved client</label><input id="f-client" type="search" autocapitalize="words" autocomplete="off" placeholder="Start typing a name"><div class="sugg" id="f-sugg"></div></div>';
 }
 function clientMatch(c,q){q=String(q||'').toLowerCase().trim();if(!q)return true;const qq=q.replace(/\s/g,'');
   return [c.name,c.phone,c.address,c.vehicle].some(x=>String(x||'').toLowerCase().includes(q))||String(c.reg||'').toLowerCase().replace(/\s/g,'').includes(qq)||String(c.phone||'').replace(/\s/g,'').includes(qq)}
@@ -1284,7 +1284,7 @@ function renderClientForm(){
   const opt=(val,label)=>'<option value="'+val+'"'+((c.type||'')===val?' selected':'')+'>'+label+'</option>';
   let h='<div class="fhead gut"><div class="inner2"><button type="button" data-act="'+(isNew?'close':'client-back')+'" style="color:var(--muted)">Cancel</button><h2>'+(isNew?'New client':'Edit client')+'</h2><button type="submit" form="clientform" class="save">Save</button></div></div>';
   h+='<form id="clientform" class="jobform gut" novalidate>';
-  h+='<fieldset><legend>Client</legend><div class="f"><label for="c-name">Name</label><input id="c-name" name="name" maxlength="80" value="'+esc(c.name||'')+'" placeholder="Garage or customer name" autocomplete="off"></div>'+
+  h+='<fieldset><legend>Client</legend><div class="f"><label for="c-name">Name</label><input id="c-name" name="name" maxlength="80" autocapitalize="words" value="'+esc(c.name||'')+'" placeholder="Garage or customer name" autocomplete="off"></div>'+
      '<div class="f"><label for="c-phone">Phone</label><input id="c-phone" name="phone" type="tel" class="mono" value="'+esc(c.phone||'')+'" autocomplete="off"></div>'+
      '<div class="f"><label for="c-email">Email</label><input id="c-email" name="email" type="email" value="'+esc(c.email||'')+'" autocomplete="off"></div>'+
      '<div class="f"><label for="c-address">Address</label><textarea id="c-address" name="address" rows="3">'+esc(c.address||'')+'</textarea></div></fieldset>';
