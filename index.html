@@ -587,7 +587,11 @@ const fmtDur=m=>{const f=DUR.find(d=>d[0]===Number(m));if(f)return f[1];m=Number
 const endTime=(st,m)=>{if(!st)return'';const p=st.split(':').map(Number);const t=p[0]*60+p[1]+(Number(m)||0);return pad(Math.floor(t/60)%24)+':'+pad(t%60)};
 const hhmm=ts=>{const d=new Date(ts);return pad(d.getHours())+':'+pad(d.getMinutes())};
 const firstLine=s=>String(s||'').split('\n')[0];
+/* The quick-pick service buttons on the job form. To change them, edit this list: keep the quotes and commas. A job can have several. */
 const SERVICES=['Stage 1 remap','Stage 2 remap','Economy remap','Gearbox remap','Dyno run','Diagnostics'];
+const svcList=v=>String(v||'').split(',').map(x=>x.trim()).filter(Boolean); /* the service field holds the chosen services separated by commas */
+function markPresets(val){const l=svcList(val);document.querySelectorAll('.preset').forEach(b=>{const on=l.includes(b.dataset.v);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false')})}
+const nowHHMM=()=>{const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')};
 const STATUS={booked:'Booked',in_progress:'In progress',done:'Done',cancelled:'Cancelled'};
 const ICON={
  pin:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
@@ -1048,7 +1052,7 @@ function renderDetail(){
 
 /* ---------- form ---------- */
 function renderForm(){
-  const base={type:'unit',date:S.day,start:'09:00',duration:60,techId:(S.worker!=='all'?S.worker:''),wid:'',status:'booked'};
+  const base={type:'unit',date:S.day,start:(S.day===today()?nowHHMM():'09:00'),duration:60,techId:(S.worker!=='all'?S.worker:''),wid:'',status:'booked'};
   const pc=S.prefill;
   if(pc)Object.assign(base,{clientId:pc.id,customerName:pc.name||'',phone:pc.phone||'',address:pc.address||'',price:pc.price||'',notes:pc.notes||'',type:pc.type||'unit'});
   const j=S.editing||base;
@@ -1070,8 +1074,8 @@ function renderForm(){
      '<div class="f"><label for="f-phone">Phone</label><input id="f-phone" name="phone" type="tel" class="mono" value="'+esc(j.phone||'')+'" autocomplete="off"></div>'+
      '<div class="regrow"><div class="f"><label for="f-reg">Reg</label><input id="f-reg" name="reg" class="regin" value="'+esc(j.reg||'')+'" autocomplete="off" autocapitalize="characters"></div><div class="f"><label for="f-vehicle">Make and model</label><input id="f-vehicle" name="vehicle" value="'+esc(j.vehicle||'')+'" autocomplete="off"></div></div>'+(DVLA_LOOKUP_URL?'<div class="reglook"><button type="button" class="btn soft sm" id="reglook" data-act="reg-lookup">Look up reg</button><p class="note" id="reg-msg" role="status" aria-live="polite"></p></div>':'')+
      '<label class="check" for="f-saveclient" id="saveclient-wrap"'+(linkedC||!S.manager?' hidden':'')+'><input type="checkbox" id="f-saveclient" name="saveClient">Save to my client list</label></fieldset>';
-  h+='<fieldset><legend>The job</legend><div class="presets">'+SERVICES.map(s=>'<button type="button" class="preset'+(j.service===s?' on':'')+'" data-act="preset" data-v="'+esc(s)+'">'+esc(s)+'</button>').join('')+'</div>'+
-     '<div class="f"><label for="f-service">Service</label><input id="f-service" name="service" value="'+esc(j.service||'')+'" placeholder="Pick above or type your own"></div>'+
+  h+='<fieldset><legend>The job</legend><div class="presets">'+SERVICES.map(s=>'<button type="button" class="preset'+(svcList(j.service).includes(s)?' on':'')+'" aria-pressed="'+(svcList(j.service).includes(s)?'true':'false')+'" data-act="preset" data-v="'+esc(s)+'">'+esc(s)+'</button>').join('')+'</div>'+
+     '<div class="f"><label for="f-service">Service</label><input id="f-service" name="service" value="'+esc(j.service||'')+'" placeholder="Pick one or more above, or type your own"></div>'+
      '<div class="f"><label for="f-description">Description</label><textarea id="f-description" name="description" rows="3">'+esc(j.description||'')+'</textarea></div></fieldset>';
   h+='<fieldset><legend>Price</legend><div class="grid2"><div class="f"><label for="f-price">Job price (£)</label><input id="f-price" name="price" class="mono" inputmode="decimal" value="'+(j.price!=null&&j.price!==''?esc(j.price):'')+'"></div><div class="f"><label for="f-deposit">Deposit paid (£)</label><input id="f-deposit" name="deposit" class="mono" inputmode="decimal" value="'+(j.deposit?esc(j.deposit):'')+'"></div></div>'+
      '<div class="left"><span>Left to collect</span><b id="f-left">£0.00</b></div><div class="f"><span class="lab" id="paid-lab">Payment</span><div class="seg" role="radiogroup" aria-labelledby="paid-lab"><label class="unp"><input type="radio" name="paid" id="f-paid-no" value="no"'+(j.paid?'':' checked')+'><span>Unpaid</span></label><label class="pd"><input type="radio" name="paid" id="f-paid-yes" value="yes"'+(j.paid?' checked':'')+'><span>Paid</span></label></div></div></fieldset>';
@@ -1659,7 +1663,7 @@ document.addEventListener('click',async ev=>{
   else if(a==='new-job'){S.editing=null;openSheet('form');renderForm()}
   else if(a==='edit'){S.editing=Object.assign({},findJob(S.openKey));S.sheet='form';renderForm()}
   else if(a==='back-detail'){S.editing=null;S.sheet='detail';renderDetail()}
-  else if(a==='preset'){const f=$('#jobform');f.elements.service.value=v;document.querySelectorAll('.preset').forEach(b=>b.classList.toggle('on',b.dataset.v===v))}
+  else if(a==='preset'){const f=$('#jobform');const cur=svcList(f.elements.service.value);const i=cur.indexOf(v);if(i<0)cur.push(v);else cur.splice(i,1);f.elements.service.value=cur.join(', ');markPresets(f.elements.service.value)}
   else if(a==='status'||a==='quick'){
     const j=findJob(a==='quick'?v:S.openKey);if(!j)return;const s=a==='quick'?el.dataset.s:v;S.confirmCancel=false;
     await write(()=>jobsCol(j.wid).doc(j.id).update({status:s,updatedAt:Date.now()}),'Marked '+STATUS[s].toLowerCase());
@@ -1751,7 +1755,7 @@ document.addEventListener('input',async ev=>{
   const t=ev.target;
   if(t.form&&t.form.id==='jobform'&&(t.name==='price'||t.name==='deposit'))updateLeft();
   if(t.form&&t.form.id==='jobform'&&(t.name==='start'||t.name==='date'||t.name==='bay'))updateClash();
-  if(t.id==='f-service')document.querySelectorAll('.preset').forEach(b=>b.classList.toggle('on',b.dataset.v===t.value));
+  if(t.id==='f-service')markPresets(t.value);
   if(t.form&&t.form.id==='sqform')sqUpdate(t);
   if(t.id==='f-client')showSugg(t.value);
   if(t.id==='c-name'||t.id==='f-customerName'){const sl=$('#dup-slot');if(sl)sl.innerHTML=''}
