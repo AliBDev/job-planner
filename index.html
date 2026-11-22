@@ -1640,9 +1640,8 @@ function renderBoard(force){
   const js=S.jobs.filter(j=>j.date===t&&j.type!=='mobile'&&live(j)).sort(byStart);
   const carry=S.jobs.filter(j=>j.type!=='mobile'&&j.status==='in_progress'&&j.date<t&&j.date>=addDays(t,-14)).sort(byStart);
   if(!isToday)carry.length=0; /* carried-over cars belong to today's screen only */
-  const mob=S.jobs.filter(j=>j.date===t&&j.type==='mobile'&&live(j)).sort(byStart);
   const tmrList=S.jobs.filter(j=>j.date===addDays(t,1)&&j.type!=='mobile'&&live(j)).sort(byStart);
-  boardMark(js.concat(carry,mob));
+  boardMark(js.concat(carry));
   const next=js.filter(j=>(j.status||'booked')==='booked');
   const prog=carry.concat(js.filter(j=>j.status==='in_progress'));
   const done=js.filter(j=>j.status==='done');
@@ -1665,20 +1664,15 @@ function renderBoard(force){
     const shown=max&&list.length>max?list.slice(-max):list;const more=list.length-shown.length;
     return '<section class="b-col '+kind+(list.length>2?' dense':'')+(list.length>4?' xdense':'')+'" aria-label="'+esc(title)+'"><header class="b-colh"><h2>'+esc(title)+'</h2><span class="b-count">'+list.length+'</span></header><div class="b-list">'+
       (list.length?(more?'<div class="b-more">+'+more+' earlier</div>':'')+shown.map(j=>card(j,kind,list.length>4)).join(''):'<div class="b-empty">'+esc(empty)+'</div>')+'</div></section>'};
-  const mobHTML=mob.length?'<section class="b-mob" aria-label="Mobile jobs"><span class="b-mobh">'+(isToday?'Mobile today':'Mobile · '+esc(shortDay(t)))+'</span>'+mob.map(j=>{
-      const s=j.status||'booked';const tn=jobTechName(j);const f=fresh(j);
-      const where=priv?'Mobile job':(j.customerName||'Mobile job'); /* the client's name, not the address */
-      return '<span class="b-mchip s-'+esc(s)+(f?' b-new':'')+'"><b>'+esc(j.start||'')+'</b> '+esc(where)+(j.reg?' <span class="b-mreg">'+esc(j.reg)+'</span>':'')+' · '+esc(tn||'No technician')+' · '+esc(STATUS[s]||'Booked')+'</span>'}).join('')+'</section>':'';
   const tf=tmrList[0];
   const tmrTxt=(isToday?'Tomorrow':esc(shortDay(addDays(t,1))))+': '+tmrList.length+(tmrList.length===1?' unit job':' unit jobs')+(tf?' · first at '+esc(tf.start||'')+(tf.reg?' · '+esc(tf.reg):'')+(tf.vehicle?' '+esc(tf.vehicle):''):'');
   const off=!!S.offline;
   el.innerHTML=(off?'<div class="b-offbar" role="alert">Connection lost. Reconnecting… This screen may be out of date.</div>':'')+
     '<header class="b-top"><img class="b-logo" src="assets/logo-tv.png" alt="Custom Remaps UK"><div><div class="b-eyebrow">Unit jobs'+(isToday?'':' · viewing another day')+'</div><h1>'+esc(longDay(t))+'</h1></div>'+
     '<div class="b-days"><button class="b-btn" data-act="board-day" data-v="-1" aria-label="Previous day">&lsaquo;</button><label class="sr" for="b-date">Choose a day</label><input type="date" id="b-date" class="b-date" value="'+esc(t)+'"><button class="b-btn" data-act="board-day" data-v="1" aria-label="Next day">&rsaquo;</button>'+(isToday?'':'<button class="b-btn b-today" data-act="board-day" data-v="today">Back to today</button>')+'</div>'+
-    '<div class="b-sum"><span><b>'+next.length+'</b> to do</span><span><b>'+prog.length+'</b> in progress</span><span><b>'+done.length+'</b> done</span></div>'+
+    '<div class="b-sum"><span><b>'+next.length+'</b> to do</span><span><b>'+prog.length+'</b> in progress</span><span><b>'+done.length+'</b> completed</span></div>'+
     '<div class="b-clock" id="b-clock">'+clockHTML(now)+'</div></header>'+
-    '<div class="b-grid">'+col(isToday?'Up next':'Booked',next,'next',isToday?'Nothing waiting. New unit jobs appear here as soon as they are booked.':'No unit jobs booked for this day.')+col('In progress',prog,'prog',isToday?'No cars being worked on right now.':'Nothing in progress.')+col(isToday?'Done today':'Done',done,'done',isToday?'Nothing finished yet today.':'Nothing marked done.',6)+'</div>'+
-    mobHTML+
+    '<div class="b-grid">'+col(isToday?'Up next':'Booked',next,'next',isToday?'Nothing waiting. New unit jobs appear here as soon as they are booked.':'No unit jobs booked for this day.')+col('In progress',prog,'prog',isToday?'No cars being worked on right now.':'Nothing in progress.')+col('Completed',done,'done',isToday?'Nothing finished yet today.':'Nothing completed.',6)+'</div>'+
     '<footer class="b-bot"><span>'+tmrTxt+'</span>'+(off?'<span class="b-off">Offline</span>':'<span class="b-live">Live · last change '+(S.lastSync?hhmm(S.lastSync):'--:--')+'</span>')+
     '<span class="b-ctl"><button class="b-btn" data-act="board-priv">'+(priv?'Show names':'Hide names')+'</button><button class="b-btn" data-act="board-full">Full screen</button><button class="b-btn" data-act="board-exit">Back to app</button></span></footer>';
   S.bScroll=S.bScroll||{};
