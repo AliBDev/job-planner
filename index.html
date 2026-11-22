@@ -232,6 +232,11 @@ legend{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:
 .regrow{display:grid;grid-template-columns:minmax(0,130px) minmax(0,1fr);gap:10px}
 .reglook{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .reglook .note{margin:0;flex:1;min-width:0;overflow-wrap:anywhere}
+.surprise{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
+.surprise video{max-width:100%;max-height:100%;border-radius:14px;background:#000}
+.surprise .sp-wrap{position:relative;display:flex;max-height:100%;max-width:100%}
+.surprise .sp-play{position:absolute;inset:0;margin:auto;width:84px;height:84px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#111;font-size:34px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+.surprise .sp-x{position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:26px;line-height:1}
 .presets{display:flex;flex-wrap:wrap;gap:6px}
 .preset{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600}
 .preset.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -687,6 +692,7 @@ async function startWorker(){
     ref.get().then(s=>{cs=s},()=>{csErr=true})
   ]);
   if(!al){noAccessView();return false}
+  S.allowName=al.name||'';
   try{const s=cs;if(csErr)throw new Error('read');
     if(!s.exists)await ref.set({email:S.email,techId:al.techId||'',name:al.name||'',joinedAt:Date.now()});
     else if((s.data()||{}).techId!==(al.techId||''))await ref.update({email:S.email,techId:al.techId||'',name:al.name||''});
@@ -694,6 +700,30 @@ async function startWorker(){
   subJobs(S.me,S.me);subDM(S.me);subTeam();
   return true;
 }
+
+/* ---------- morning surprise clip ---------- */
+/* A short clip for one technician, shown on their first open before noon, once per day on that phone.
+   match: words that must all appear in their name (the name set up for them in the app, or their Google name). Set on:false to switch it off. */
+const SURPRISE={on:true,match:['abdul','majeed'],src:'assets/morning-clip.mp4',key:'morningClipSeen',until:12};
+function maybeSurprise(){
+  if(!SURPRISE.on||S.manager||!S.ready||document.getElementById('surprise'))return;
+  const nm=((S.allowName||'')+' '+(S.googleName||'')).toLowerCase();
+  if(!SURPRISE.match.every(w=>nm.includes(w)))return;
+  if(new Date().getHours()>=SURPRISE.until)return;
+  let seen='';try{seen=localStorage.getItem(SURPRISE.key)||''}catch(e){}
+  if(seen===today())return;
+  try{localStorage.setItem(SURPRISE.key,today())}catch(e){}
+  const o=document.createElement('div');o.id='surprise';o.className='surprise';o.setAttribute('role','dialog');o.setAttribute('aria-label','Good morning');
+  o.innerHTML='<div class="sp-wrap"><video playsinline preload="metadata" src="'+esc(SURPRISE.src)+'#t=0.1"></video><button type="button" class="sp-play" aria-label="Play">&#9654;</button></div><button type="button" class="sp-x" aria-label="Close">&times;</button>';
+  const v=o.querySelector('video');
+  const close=()=>{try{v.pause()}catch(e){}o.remove()};
+  o.querySelector('.sp-play').addEventListener('click',()=>{o.querySelector('.sp-play').hidden=true;v.play().catch(()=>{o.querySelector('.sp-play').hidden=false})});
+  o.querySelector('.sp-x').addEventListener('click',close);
+  v.addEventListener('ended',close);
+  v.addEventListener('error',()=>{try{localStorage.removeItem(SURPRISE.key)}catch(e){}o.remove()}); /* couldn't load (offline): try again next open */
+  document.body.appendChild(o);
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')maybeSurprise()});
 
 /* ---------- names ---------- */
 let namesBusy=false;
@@ -1921,12 +1951,13 @@ async function boot(){
     showState('Loading','Getting your jobs…');
     const user=FB.makeUser(u);
     S.db=FB.db;S.user=user;S.me=u.uid;S.email=user.email;
-    S.manager=await user.isOwner();
+    S.manager=await user.isOwner();S.googleName=u.displayName||'';
     {const sig=u.uid+'|'+(u.displayName||'')+'|'+(u.photoURL||'');let last='';try{last=localStorage.getItem('profSig')||''}catch(e){}
       if(sig!==last)FB.saveProfile(u).then(()=>{try{localStorage.setItem('profSig',sig)}catch(e){}},()=>{})}
     if(S.manager){S.ready=true;startManager();backupNudge()}
     else{const ok=await startWorker();if(!ok)return;S.ready=true}
     setBoard(location.hash==='#board');
+    maybeSurprise();
   });
 }
 boot();
