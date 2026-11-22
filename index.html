@@ -232,6 +232,11 @@ legend{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:
 .regrow{display:grid;grid-template-columns:minmax(0,130px) minmax(0,1fr);gap:10px}
 .reglook{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .reglook .note{margin:0;flex:1;min-width:0;overflow-wrap:anywhere}
+.surprise{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
+.surprise video{max-width:100%;max-height:100%;border-radius:14px;background:#000}
+.surprise .sp-wrap{position:relative;display:flex;max-height:100%;max-width:100%}
+.surprise .sp-play{position:absolute;inset:0;margin:auto;width:84px;height:84px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#111;font-size:34px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+.surprise .sp-x{position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:26px;line-height:1}
 .presets{display:flex;flex-wrap:wrap;gap:6px}
 .preset{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600}
 .preset.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -691,12 +696,85 @@ async function startWorker(){
     ref.get().then(s=>{cs=s},()=>{csErr=true})
   ]);
   if(!al){noAccessView();return false}
+  S.allowName=al.name||'';
   try{const s=cs;if(csErr)throw new Error('read');
     if(!s.exists)await ref.set({email:S.email,techId:al.techId||'',name:al.name||'',joinedAt:Date.now()});
     else if((s.data()||{}).techId!==(al.techId||''))await ref.update({email:S.email,techId:al.techId||'',name:al.name||''});
   }catch(e){S.readOnly=true}
   subJobs(S.me,S.me);subDM(S.me);subTeam();
   return true;
+}
+
+/* ---------- morning surprise clip ---------- */
+/* A short clip for one technician, shown on their first open of a day before the cut-off hour.
+   match: words that must all appear in their name (the name set up for them in the app, or their Google name).
+   CLIPS: the video files (in /assets). CLIP_ADMIN: the only login that gets the control card on the Team tab. Set on:false to remove the feature. */
+const SURPRISE={on:true,match:['abdul','majeed'],key:'morningClipSeen',againKey:'morningClipAgain'};
+const CLIPS=[{id:'meme1',file:'assets/morning-clip.mp4',label:'Work meme'}];
+const CLIP_ADMIN=['abhatti89@gmail.com'];
+const CLIP_DEFAULT={on:true,until:12,days:[0,1,2,3,4,5,6],pick:'meme1',again:0};
+const clipCfg=()=>Object.assign({},CLIP_DEFAULT,S.clipCfg||{});
+const clipFor=(cfg,d)=>cfg.pick==='rotate'&&CLIPS.length>1?CLIPS[Math.floor(d.getTime()/864e5)%CLIPS.length]:(CLIPS.find(c=>c.id===cfg.pick)||CLIPS[0]);
+function playClip(file,opts){
+  opts=opts||{};if(document.getElementById('surprise'))return;
+  const o=document.createElement('div');o.id='surprise';o.className='surprise';o.setAttribute('role','dialog');o.setAttribute('aria-label','Good morning');
+  o.innerHTML='<div class="sp-wrap"><video playsinline preload="metadata" src="'+esc(file)+'#t=0.1"></video><button type="button" class="sp-play" aria-label="Play">&#9654;</button></div><button type="button" class="sp-x" aria-label="Close">&times;</button>';
+  const v=o.querySelector('video'),pb=o.querySelector('.sp-play');
+  const close=()=>{try{v.pause()}catch(e){}o.remove()};
+  pb.addEventListener('click',()=>{pb.hidden=true;v.play().then(()=>{if(opts.onPlay)opts.onPlay()},()=>{pb.hidden=false})});
+  o.querySelector('.sp-x').addEventListener('click',close);
+  v.addEventListener('ended',close);
+  v.addEventListener('error',()=>{o.remove();if(opts.onError)opts.onError()}); /* couldn't load (offline) */
+  document.body.appendChild(o);
+}
+async function maybeSurprise(){
+  if(!SURPRISE.on||S.manager||!S.ready||document.getElementById('surprise'))return;
+  const nm=((S.allowName||'')+' '+(S.googleName||'')).toLowerCase();
+  if(!SURPRISE.match.every(w=>nm.includes(w)))return;
+  try{const s=await S.db.doc('allow/'+S.email).get();if(s.exists)S.allowClip=(s.data()||{}).clip||null}catch(e){} /* pick up the latest settings, else use what we had */
+  const cfg=Object.assign({},CLIP_DEFAULT,S.allowClip||{});
+  if(!cfg.on||document.getElementById('surprise'))return;
+  const d=new Date();let seen='',again=0;
+  try{seen=localStorage.getItem(SURPRISE.key)||'';again=Number(localStorage.getItem(SURPRISE.againKey))||0}catch(e){}
+  const asked=cfg.again>again; /* the manager pressed "show again" */
+  if(!asked){
+    if(seen===today())return;
+    if(d.getHours()>=cfg.until)return;
+    if(!(cfg.days||[]).includes(d.getDay()))return;
+  }
+  try{localStorage.setItem(SURPRISE.key,today());if(asked)localStorage.setItem(SURPRISE.againKey,String(cfg.again))}catch(e){}
+  const note=f=>{try{S.db.doc('crew/'+S.me).update(f).catch(()=>{})}catch(e){}}; /* lets the manager see when it last showed */
+  note({clipShownAt:Date.now()});
+  playClip(clipFor(cfg,d).file,{onPlay:()=>note({clipPlayedAt:Date.now()}),onError:()=>{try{localStorage.removeItem(SURPRISE.key)}catch(e){}}});
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')maybeSurprise()});
+/* the control card (Team tab, CLIP_ADMIN only) */
+function clipTech(){return S.techs.find(x=>x.email&&SURPRISE.match.every(w=>String(x.name||'').toLowerCase().includes(w)))}
+function ensureClipCfg(em){
+  if(S.clipEm===em)return;S.clipEm=em;
+  S.db.doc('allow/'+em).get().then(s=>{S.clipCfg=s.exists?((s.data()||{}).clip||{}):{};S.clipLoaded=true;if(S.tab==='team')render()},()=>{S.clipLoaded='err'});
+}
+function clipCardHTML(){
+  if(!S.manager||!CLIP_ADMIN.includes(S.email))return '';
+  const t=clipTech();if(!t)return '';
+  const em=String(t.email).toLowerCase();ensureClipCfg(em);
+  const c=clipCfg();const cr=S.crew.find(x=>x.id===t.uid)||S.crew.find(x=>String(x.email||'').toLowerCase()===em)||{};
+  const fmt=ms=>ms?new Date(ms).toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  const last=cr.clipShownAt?'Last shown '+fmt(cr.clipShownAt)+(cr.clipPlayedAt&&cr.clipPlayedAt>=cr.clipShownAt?' · he pressed play':' · he did not press play'):'Not shown yet';
+  const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let h='<div class="box" id="clipcard"><span class="lab">Morning clip for '+esc(t.name)+'</span><p class="note">Only you can see this. It plays once, on his first open of the day. '+(S.clipLoaded==='err'?'Could not load the settings.':esc(last))+'</p>';
+  h+='<div class="presets"><button type="button" class="preset'+(c.on?' on':'')+'" data-act="clip-on" aria-pressed="'+(c.on?'true':'false')+'">'+(c.on?'On':'Off')+'</button></div>';
+  h+='<div class="f"><span class="lab">Days</span><div class="presets">'+[1,2,3,4,5,6,0].map(d=>'<button type="button" class="preset'+(c.days.includes(d)?' on':'')+'" data-act="clip-day" data-v="'+d+'" aria-pressed="'+(c.days.includes(d)?'true':'false')+'">'+DN[d]+'</button>').join('')+'</div></div>';
+  h+='<div class="grid2"><div class="f"><label for="clip-until">Only before</label><select id="clip-until">'+[8,9,10,11,12,13,14,15,16,17,18].map(n=>'<option value="'+n+'"'+(c.until===n?' selected':'')+'>'+String(n).padStart(2,'0')+':00</option>').join('')+'</select></div>';
+  h+='<div class="f"><label for="clip-pick">Clip</label><select id="clip-pick">'+CLIPS.map(x=>'<option value="'+esc(x.id)+'"'+(c.pick===x.id?' selected':'')+'>'+esc(x.label)+'</option>').join('')+(CLIPS.length>1?'<option value="rotate"'+(c.pick==='rotate'?' selected':'')+'>Rotate daily</option>':'')+'</select></div></div>';
+  h+='<div class="presets"><button type="button" class="btn ghost sm" data-act="clip-preview">Preview on this phone</button><button type="button" class="btn ghost sm" data-act="clip-again"'+(c.on?'':' disabled')+'>Show again on his next open</button></div>';
+  if(c.again&&cr.clipShownAt&&c.again>cr.clipShownAt)h+='<p class="note">Queued: it will play on his next open.</p>';
+  return h+'</div>';
+}
+async function clipSet(patch,msg){
+  const t=clipTech();if(!t||!t.email||!CLIP_ADMIN.includes(S.email))return;
+  const next=Object.assign({},clipCfg(),patch);S.clipCfg=next;render();
+  await write(()=>S.db.doc('allow/'+String(t.email).toLowerCase()).update({clip:next}),msg||'Saved');
 }
 
 /* ---------- names ---------- */
@@ -1426,7 +1504,7 @@ function renderTeam(){
   const keep={};['tech-name','tech-phone','tech-email','te-input'].forEach(id=>{const e=document.getElementById(id);if(e)keep[id]=e.value});
   const linkKeep={};document.querySelectorAll('.linksel').forEach(s=>{linkKeep[s.id]=s.value});
   let h=(!FEATURE_UNIT_SCREEN?'':'<div class="box"><span class="lab">Unit screen</span><p class="note">Show today\'s unit jobs on a TV in the operations room. Prices are hidden and it updates as soon as a job is added or changed. On the TV, open this app\'s link with <b class="mono-s">#board</b> added to the end, signed in as the Manager.</p><button class="btn soft" style="align-self:flex-start" data-act="board-open">Open unit screen</button></div>')+
-    '<form class="box" id="techform" novalidate><span class="lab">Add a technician</span>'+
+    clipCardHTML()+'<form class="box" id="techform" novalidate><span class="lab">Add a technician</span>'+
     '<div class="f"><label for="tech-name">Name</label><input id="tech-name" autocomplete="off" maxlength="60" placeholder="e.g. Dan Morris"></div>'+
     '<div class="f"><label for="tech-phone">Phone (optional)</label><input id="tech-phone" type="tel" class="mono" maxlength="30" autocomplete="off"></div>'+
     '<div class="f"><label for="tech-email">Email for app access (optional)</label><input id="tech-email" type="email" maxlength="120" autocomplete="off" placeholder="name@example.com"></div>'+
@@ -1663,6 +1741,10 @@ document.addEventListener('click',async ev=>{
   else if(a==='new-job'){S.editing=null;openSheet('form');renderForm()}
   else if(a==='edit'){S.editing=Object.assign({},findJob(S.openKey));S.sheet='form';renderForm()}
   else if(a==='back-detail'){S.editing=null;S.sheet='detail';renderDetail()}
+  else if(a==='clip-on'){await clipSet({on:!clipCfg().on},clipCfg().on?'Clip switched off':'Clip switched on')}
+  else if(a==='clip-day'){const d=Number(v),cur=clipCfg().days.slice();const i=cur.indexOf(d);if(i<0)cur.push(d);else if(cur.length>1)cur.splice(i,1);else{toast('Keep at least one day, or switch the clip off.');return}await clipSet({days:cur.sort()})}
+  else if(a==='clip-again'){await clipSet({again:Date.now()},'It will play on his next open')}
+  else if(a==='clip-preview'){const c=clipCfg();playClip(clipFor(c,new Date()).file,{preview:true})}
   else if(a==='preset'){const f=$('#jobform');const cur=svcList(f.elements.service.value);const i=cur.indexOf(v);if(i<0)cur.push(v);else cur.splice(i,1);f.elements.service.value=cur.join(', ');markPresets(f.elements.service.value)}
   else if(a==='status'||a==='quick'){
     const j=findJob(a==='quick'?v:S.openKey);if(!j)return;const s=a==='quick'?el.dataset.s:v;S.confirmCancel=false;
@@ -1745,6 +1827,8 @@ document.addEventListener('change',ev=>{
   const t=ev.target;
   if(t.id==='worker-filter'){S.worker=t.value;render()}
   if(t.id==='import-file'&&t.files&&t.files[0]){readImport(t.files[0]);t.value=''}
+  if(t.id==='clip-until'){clipSet({until:Number(t.value)||12});return}
+  if(t.id==='clip-pick'){clipSet({pick:t.value});return}
   if(t.id==='b-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.bTouch=Date.now();S.bDate=t.value===today()?null:t.value;S.bFresh={};renderBoard(true)}
   if(t.id==='goto-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.day=t.value;S.centerDay=true;render()}
   if(t.form&&t.form.id==='sqform')sqUpdate(t);
@@ -1925,12 +2009,13 @@ async function boot(){
     showState('Loading','Getting your jobs…');
     const user=FB.makeUser(u);
     S.db=FB.db;S.user=user;S.me=u.uid;S.email=user.email;
-    S.manager=await user.isOwner();
+    S.manager=await user.isOwner();S.googleName=u.displayName||'';
     {const sig=u.uid+'|'+(u.displayName||'')+'|'+(u.photoURL||'');let last='';try{last=localStorage.getItem('profSig')||''}catch(e){}
       if(sig!==last)FB.saveProfile(u).then(()=>{try{localStorage.setItem('profSig',sig)}catch(e){}},()=>{})}
     if(S.manager){S.ready=true;startManager();backupNudge()}
     else{const ok=await startWorker();if(!ok)return;S.ready=true}
     setBoard(location.hash==='#board');
+    maybeSurprise();
   });
 }
 boot();
