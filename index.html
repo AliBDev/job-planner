@@ -1147,7 +1147,7 @@ function renderForm(){
      '<div class="grid2"><div class="f"><label for="f-duration">Length</label><select id="f-duration" name="duration">'+durOpts+'</select></div>'+(S.manager?'<div class="f"><label for="f-assignee">Technician</label><select id="f-assignee" name="assignee">'+crewOpts+'</select>'+(S.techs.length?'':'<span class="note" style="font-size:12px">Add technicians in the Team tab.</span>')+'</div>':'<div class="f"><span class="lab" style="padding-top:2px">Technician</span><input type="hidden" name="assignee" value=""><span style="padding:11px 0;font-weight:600">You</span></div>')+'</div>'+
      '<input type="hidden" id="f-bay" name="bay" value="'+esc(j.bay||'')+'"></fieldset>';
   h+='<div class="banner" id="f-clash" role="status" hidden></div>';
-  h+='<fieldset><legend>Customer and vehicle</legend><input type="hidden" name="clientId" id="f-clientId" value="'+esc(linkedC?linkedC.id:'')+'"><div id="f-lookup">'+lookupHTML(linkedC)+'</div><div class="f"><label for="f-customerName">Customer name</label><input id="f-customerName" name="customerName" value="'+esc(j.customerName||'')+'" autocomplete="off" required></div>'+
+  h+='<fieldset><legend>Customer and vehicle</legend><input type="hidden" name="clientId" id="f-clientId" value="'+esc(linkedC?linkedC.id:'')+'"><div id="f-lookup">'+lookupHTML(linkedC)+'</div><div class="f"><label for="f-customerName">Customer name (optional)</label><input id="f-customerName" name="customerName" value="'+esc(j.customerName||'')+'" autocomplete="off"></div>'+
      '<div class="f" id="addr-wrap"'+(mob?'':' hidden')+'><label for="f-address" id="addr-label">'+(mob?'Garage and address':'Customer address (optional)')+'</label><textarea id="f-address" name="address" rows="2">'+esc(j.address||'')+'</textarea></div>'+
      '<div class="f"><label for="f-phone">Phone</label><input id="f-phone" name="phone" type="tel" class="mono" value="'+esc(j.phone||'')+'" autocomplete="off"></div>'+
      '<div class="regrow"><div class="f"><label for="f-reg">Reg</label><input id="f-reg" name="reg" class="regin" value="'+esc(j.reg||'')+'" autocomplete="off" autocapitalize="characters"></div><div class="f"><label for="f-vehicle">Make and model</label><input id="f-vehicle" name="vehicle" value="'+esc(j.vehicle||'')+'" autocomplete="off"></div></div>'+(DVLA_LOOKUP_URL?'<div class="reglook"><button type="button" class="btn soft sm" id="reglook" data-act="reg-lookup">Look up reg</button><p class="note" id="reg-msg" role="status" aria-live="polite"></p></div>':'')+
@@ -1248,13 +1248,14 @@ async function submitForm(f){
     service:v('service'),description:v('description'),price:num(v('price')),deposit:num(v('deposit')),paid:f.elements.paid.value==='yes',notes:v('notes'),
     clientId:v('clientId'),assignee:wid,techId:tech?tech.id:'',techName:tech?tech.name:'',status:old?(old.status||'booked'):'booked',createdAt:old&&old.createdAt?old.createdAt:Date.now(),updatedAt:Date.now()};
   if(data.type==='mobile')data.bay='';
-  if(!data.customerName||!data.date||!data.start){toast('Add a customer name, date and start time.');return}
-  if(S.manager&&!data.clientId){
+  if(!data.date||!data.start){toast('Add a date and start time.');return}
+  if(S.manager&&!data.clientId&&data.customerName){
     const key=normName(data.customerName);const sims=similarClients(data.customerName);
     const same=sims.filter(c=>normName(c.name)===key);
     if(same.length===1)data.clientId=same[0].id;   /* same name apart from Ltd, punctuation or case: link it */
     else if(S.dupAck!==key&&sims.length&&showDup('job',sims))return;
   }
+  if(f.elements.saveClient&&f.elements.saveClient.checked&&!data.clientId&&!data.customerName){toast('Add a customer name to save them as a client.');return}
   if(f.elements.saveClient&&f.elements.saveClient.checked&&!data.clientId){
     const cref=S.db.collection('board/main/clients').doc();
     const okc=await write(()=>cref.set({name:data.customerName.slice(0,80),phone:data.phone,address:data.address,email:'',price:data.price,type:data.type,notes:data.notes,createdAt:Date.now(),updatedAt:Date.now()}));
