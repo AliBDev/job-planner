@@ -284,6 +284,7 @@ legend{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:
 .crew{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
 .crew:last-child{border-bottom:0}
 .crew{flex-wrap:wrap}
+.teform{flex:1 0 100%;margin:6px 0 2px}
 .tlink{display:flex;align-items:center;gap:12px;background:transparent;border:0;padding:0;text-align:left;color:inherit;flex:1 1 200px;min-width:0;cursor:pointer}
 .tlink .nm{display:flex;flex-direction:column;gap:2px;min-width:0}
 .tlink .seejobs{color:var(--accent);font-size:13px;font-weight:600}
@@ -1510,7 +1511,7 @@ function openThread(k){if(!FEATURE_MESSAGING)return;S.tab='messages';S.thread=k;
 function renderTeam(){
   const ws=weekStart(today()),we=addDays(ws,6);
   const ae=document.activeElement;const focusId=ae&&ae.id;
-  const keep={};['tech-name','tech-phone','tech-email','te-input'].forEach(id=>{const e=document.getElementById(id);if(e)keep[id]=e.value});
+  const keep={};['tech-name','tech-phone','tech-email','te-input','ed-name','ed-phone','ed-email'].forEach(id=>{const e=document.getElementById(id);if(e)keep[id]=e.value});
   const linkKeep={};document.querySelectorAll('.linksel').forEach(s=>{linkKeep[s.id]=s.value});
   let h=(!FEATURE_UNIT_SCREEN?'':'<div class="box"><span class="lab">Unit screen</span><p class="note">Show today\'s unit jobs on a TV in the operations room. Prices are hidden and it updates as soon as a job is added or changed. On the TV, open this app\'s link with <b class="mono-s">#board</b> added to the end, signed in as the Manager.</p><button class="btn soft" style="align-self:flex-start" data-act="board-open">Open unit screen</button></div>')+
     clipCardHTML()+'<form class="box" id="techform" novalidate><span class="lab">Add a technician</span>'+
@@ -1531,9 +1532,9 @@ function renderTeam(){
       act=up?'<span class="note">Move their '+up+' upcoming '+(up===1?'job':'jobs')+' to someone else first.</span><button class="btn ghost sm" data-act="rm-no">OK</button>'
         :'<span class="note">Remove '+esc(t.name)+'?</span><button class="btn ghost sm" data-act="rm-no">Keep</button><button class="btn danger solid sm" data-act="tech-rm-yes" data-v="'+esc(t.id)+'">Remove</button>';
     }else{
-      act=(t.uid?(FEATURE_MESSAGING?'<button class="btn ghost sm" data-act="thread" data-v="dm:'+esc(t.uid)+'">Message</button>':'')+'<button class="btn ghost sm" data-act="unlink" data-v="'+esc(t.id)+'">Unlink app</button>':'')+'<button class="btn ghost sm" data-act="tech-email" data-v="'+esc(t.id)+'">'+(t.email?'Change email':'Give app access')+'</button><button class="btn danger sm" data-act="tech-rm" data-v="'+esc(t.id)+'">Remove</button>';
+      act=(t.uid?(FEATURE_MESSAGING?'<button class="btn ghost sm" data-act="thread" data-v="dm:'+esc(t.uid)+'">Message</button>':'')+'<button class="btn ghost sm" data-act="unlink" data-v="'+esc(t.id)+'">Unlink app</button>':'')+'<button class="btn ghost sm" data-act="tech-edit" data-v="'+esc(t.id)+'">Edit</button>'+(t.email?'':'<button class="btn ghost sm" data-act="tech-email" data-v="'+esc(t.id)+'">Give app access</button>')+'<button class="btn danger sm" data-act="tech-rm" data-v="'+esc(t.id)+'">Remove</button>';
     }
-    return '<div class="crew"><button class="tlink" data-act="tech-jobs" data-v="'+esc(t.id)+'" aria-label="See '+esc(t.name)+'\'s jobs">'+techAv(t,'lg')+'<span class="nm"><b>'+esc(t.name)+'</b><span>'+sub+'</span><span class="seejobs">See jobs ›</span></span></button><span class="acts">'+act+'</span>'+(S.editEmail===t.id?'<div class="linkrow"><label for="te-input" class="sr">Email for '+esc(t.name)+'</label><input id="te-input" type="email" class="csearch" value="'+esc(t.email||'')+'" placeholder="name@example.com" autocomplete="off"><button class="btn soft sm" data-act="tech-email-save" data-v="'+esc(t.id)+'">Save</button><button class="btn ghost sm" data-act="tech-email-cancel">Cancel</button></div>':'')+'</div>'}).join('')+'</div>';
+    return '<div class="crew"><button class="tlink" data-act="tech-jobs" data-v="'+esc(t.id)+'" aria-label="See '+esc(t.name)+'\'s jobs">'+techAv(t,'lg')+'<span class="nm"><b>'+esc(t.name)+'</b><span>'+sub+'</span><span class="seejobs">See jobs ›</span></span></button><span class="acts">'+act+'</span>'+(S.editEmail===t.id?'<div class="linkrow"><label for="te-input" class="sr">Email for '+esc(t.name)+'</label><input id="te-input" type="email" class="csearch" value="'+esc(t.email||'')+'" placeholder="name@example.com" autocomplete="off"><button class="btn soft sm" data-act="tech-email-save" data-v="'+esc(t.id)+'">Save</button><button class="btn ghost sm" data-act="tech-email-cancel">Cancel</button></div>':'')+(S.editTech===t.id?'<form class="box teform" id="teform" data-v="'+esc(t.id)+'" novalidate><div class="f"><label for="ed-name">Name</label><input id="ed-name" autocomplete="off" maxlength="60" autocapitalize="words" value="'+esc(t.name||'')+'"></div><div class="f"><label for="ed-phone">Phone (optional)</label><input id="ed-phone" type="tel" class="mono" maxlength="30" autocomplete="off" value="'+esc(t.phone||'')+'"></div><div class="f"><label for="ed-email">Email for app access (optional)</label><input id="ed-email" type="email" maxlength="120" autocomplete="off" value="'+esc(t.email||'')+'"></div>'+(t.uid?'<p class="note">'+esc(t.name)+' is on the app. If you change the email, they will need to sign in with the new one next time.</p>':'')+'<div class="acts"><button class="btn pri sm" type="submit">Save</button><button class="btn ghost sm" type="button" data-act="tech-edit-cancel">Cancel</button></div></form>':'')+'</div>'}).join('')+'</div>';
   const free=S.techs.filter(t=>!t.uid);
   const waiting=S.crew.filter(c=>!techByUid(c.id));
   h+='<h2 class="subh">Give a technician the app</h2><div class="box"><p class="note">Optional. Technicians on the app see only their own jobs, update them and message you. Others can still be booked; you pass the details on yourself.</p><ol class="steps"><li>Tap <b>Give app access</b> next to their name and enter the email they\'ll sign in with.</li><li>Send them this app\'s link.</li><li>They sign in with Google, or with an emailed link, using that email.</li><li>They\'re linked to their name automatically and their jobs move across.</li></ol></div>';
@@ -1759,6 +1760,8 @@ document.addEventListener('click',async ev=>{
   else if(a==='del-no'){S.confirmDel=false;renderDetail()}
   else if(a==='gsignin'){el.disabled=true;try{await FB.google()}catch(e){el.disabled=false;toast(e&&e.code==='auth/popup-closed-by-user'?'Sign-in was cancelled.':'Google sign-in didn\'t work here. Try the email link instead.')}}
   else if(a==='signout'){try{await FB.signOut()}catch(e){}location.reload()}
+  else if(a==='tech-edit'){S.editTech=v;S.editEmail=null;S.confirmRemove=null;render();const i=$('#ed-name');if(i)i.focus()}
+  else if(a==='tech-edit-cancel'){S.editTech=null;render()}
   else if(a==='tech-email'){S.editEmail=v;render();const i=$('#te-input');if(i)i.focus()}
   else if(a==='tech-email-cancel'){S.editEmail=null;render()}
   else if(a==='tech-email-save'){await saveTechEmail(v)}
@@ -1889,6 +1892,7 @@ document.addEventListener('submit',ev=>{
   if(ev.target.id==='jobform')submitForm(ev.target);
   if(ev.target.id==='composer')sendMsg();
   if(ev.target.id==='techform')addTech();
+  if(ev.target.id==='teform')saveTech(ev.target.dataset.v);
   if(ev.target.id==='clientform')saveClient(ev.target);
   if(ev.target.id==='linkform'){const em=String(($('#link-email')||{}).value||'').trim().toLowerCase();
     if(!EMAIL_RE.test(em)){toast('Type your email address.');return}
@@ -1934,6 +1938,27 @@ function autoLink(){
     const t=techById(c.techId);if(!t||t.uid)return;
     S.linking[c.id]=1;linkTech(t.id,c.id);
   });
+}
+async function saveTech(id){
+  const t=techById(id);if(!t)return;
+  const name=String(($('#ed-name')||{}).value||'').trim(),phone=String(($('#ed-phone')||{}).value||'').trim(),em=String(($('#ed-email')||{}).value||'').trim().toLowerCase();
+  if(!name){toast('Type the technician\'s name.');return}
+  if(S.techs.some(x=>x.id!==id&&String(x.name).toLowerCase()===name.toLowerCase())){toast(name+' is already on your list.');return}
+  if(em&&!EMAIL_RE.test(em)){toast('That email doesn\'t look right.');return}
+  if(em&&S.techs.some(x=>x.id!==id&&String(x.email||'').toLowerCase()===em)){toast('Another technician already has that email.');return}
+  const old=String(t.email||'').toLowerCase();
+  const ok=await write(async()=>{
+    if(old&&old!==em){ /* new sign-in email: carry over anything stored on the old record (such as clip settings) */
+      let keep={};try{const o=await S.db.doc('allow/'+old).get();if(o.exists)keep=o.data()||{}}catch(e){}
+      await S.db.doc('allow/'+old).delete();
+      if(em)await S.db.doc('allow/'+em).set(Object.assign({},keep,{techId:t.id,name:name.slice(0,60)}));
+    }else if(em){
+      if(old===em){try{await S.db.doc('allow/'+em).update({name:name.slice(0,60)})}catch(e){await S.db.doc('allow/'+em).set({techId:t.id,name:name.slice(0,60),addedAt:Date.now()})}}
+      else await S.db.doc('allow/'+em).set({techId:t.id,name:name.slice(0,60),addedAt:Date.now()});
+    }
+    await S.db.doc('board/main/techs/'+t.id).update({name:name.slice(0,60),phone:phone.slice(0,30),email:em});
+  },name+' updated');
+  if(ok){S.editTech=null;render()}
 }
 async function saveTechEmail(id){
   const t=techById(id);const inp=$('#te-input');if(!t||!inp)return;
