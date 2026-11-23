@@ -860,12 +860,20 @@ function renderTop(){
   else{title='Team';eyebrow=S.techs.length+(S.techs.length===1?' technician':' technicians')}
   const sbtn=S.tab==='schedule'?'<button class="hbtn" data-act="search" aria-label="Find a job">'+ICON.search+'</button>':'';
   const html='<img class="brand" src="assets/logo-app.png" alt="Custom Remaps UK"><div class="toprow"><div><div class="eyebrow">'+esc(eyebrow)+'</div><h1>'+esc(title)+'</h1></div><span class="tright">'+sbtn+role+'</span></div>'+extra;
-  const old=$('#days');const keepLeft=old?old.scrollLeft:null;const wasFocus=document.activeElement&&document.activeElement.id==='goto-date';
+  const old=$('#days');const keepLeft=old?old.scrollLeft:null;
+  /* remember which DATE is at the left edge (not just the pixel position): the strip's first day moves when the selected day changes */
+  let keepDate=null;if(old&&old.dataset.first){const b0=old.querySelector('.day');const stp=b0?b0.offsetWidth+4:0;if(stp>4)keepDate=addDays(old.dataset.first,Math.round(old.scrollLeft/stp))}
+  const wasFocus=document.activeElement&&document.activeElement.id==='goto-date';
   if(S.topHtml!==html){S.topHtml=html;$('#top-inner').innerHTML=html;if(wasFocus){const g=$('#goto-date');if(g)g.focus()}}
   const strip=$('#days');
   if(strip){
     if(S.centerDay||keepLeft==null){const smooth=!!S.centerDay&&keepLeft!=null;S.centerDay=false;centerSelected(smooth)}
-    else strip.scrollLeft=keepLeft;
+    else{
+      const kb=keepDate&&strip.querySelector('.day[data-v="'+keepDate+'"]');
+      strip.scrollLeft=kb?Math.max(0,kb.offsetLeft-4):keepLeft;
+      const se=strip.querySelector('.day.sel'); /* never leave the highlighted day out of view */
+      if(se&&(se.offsetLeft-4<strip.scrollLeft-1||se.offsetLeft+se.offsetWidth>strip.scrollLeft+strip.clientWidth+4))centerSelected(false);
+    }
   }
 }
 function centerSelected(smooth){
