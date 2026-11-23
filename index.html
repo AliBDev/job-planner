@@ -593,7 +593,7 @@ const endTime=(st,m)=>{if(!st)return'';const p=st.split(':').map(Number);const t
 const hhmm=ts=>{const d=new Date(ts);return pad(d.getHours())+':'+pad(d.getMinutes())};
 const firstLine=s=>String(s||'').split('\n')[0];
 /* The quick-pick service buttons on the job form. To change them, edit this list: keep the quotes and commas. A job can have several. */
-const SERVICES=['Stage 1 remap','Stage 2 remap','Economy remap','Gearbox remap','Dyno run','Diagnostics'];
+const SERVICES=['DPF','EGR','AdBlue','Stage 1 Tuning','Economy Tuning','Gearbox Tuning','Dyno Run','Diagnostics'];
 const svcList=v=>String(v||'').split(',').map(x=>x.trim()).filter(Boolean); /* the service field holds the chosen services separated by commas */
 function markPresets(val){const l=svcList(val);document.querySelectorAll('.preset').forEach(b=>{const on=l.includes(b.dataset.v);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false')})}
 const nowHHMM=()=>{const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')};
@@ -1612,10 +1612,10 @@ function renderHits(){
 async function loadExamples(){
   const d=S.day;
   const ex=[
-    {type:'unit',start:'09:30',duration:120,customerName:'James Patel (example)',phone:'07700 900456',reg:'YX19 KTL',vehicle:'VW Golf R',service:'Stage 1 remap',price:450,deposit:100,status:'in_progress',description:'Customer waiting in reception. Back up original ECU file before writing.'},
-    {type:'unit',start:'12:00',duration:60,customerName:'Sophie Clarke (example)',reg:'MW68 PLN',vehicle:'BMW 330d',service:'Dyno run',price:120,deposit:0,status:'booked'},
-    {type:'mobile',start:'10:00',duration:90,customerName:'Mark Evans (example)',reg:'BF67 HJU',vehicle:'Audi A3 2.0 TDI',service:'Economy remap',address:'Hilltop Motors\n12 Station Road',price:300,deposit:0,status:'done',paid:true},
-    {type:'mobile',start:'13:00',duration:60,customerName:'Rachel Hughes (example)',phone:'07700 900123',reg:'KV20 ZTE',vehicle:'Mercedes Sprinter 314 CDI',service:'Stage 1 remap',address:'Northgate Autos\nUnit 7, Mill Lane Trading Estate',price:350,deposit:100,status:'booked',description:'Flat spot around 2,000 rpm under load. Back up original file, write Stage 1 map, road test before handover.',notes:'Ask for Steve at reception.'}
+    {type:'unit',start:'09:30',duration:120,customerName:'James Patel (example)',phone:'07700 900456',reg:'YX19 KTL',vehicle:'VW Golf R',service:'Stage 1 Tuning',price:450,deposit:100,status:'in_progress',description:'Customer waiting in reception. Back up original ECU file before writing.'},
+    {type:'unit',start:'12:00',duration:60,customerName:'Sophie Clarke (example)',reg:'MW68 PLN',vehicle:'BMW 330d',service:'Dyno Run',price:120,deposit:0,status:'booked'},
+    {type:'mobile',start:'10:00',duration:90,customerName:'Mark Evans (example)',reg:'BF67 HJU',vehicle:'Audi A3 2.0 TDI',service:'Economy Tuning',address:'Hilltop Motors\n12 Station Road',price:300,deposit:0,status:'done',paid:true},
+    {type:'mobile',start:'13:00',duration:60,customerName:'Rachel Hughes (example)',phone:'07700 900123',reg:'KV20 ZTE',vehicle:'Mercedes Sprinter 314 CDI',service:'Stage 1 Tuning',address:'Northgate Autos\nUnit 7, Mill Lane Trading Estate',price:350,deposit:100,status:'booked',description:'Flat spot around 2,000 rpm under load. Back up original file, write Stage 1 map, road test before handover.',notes:'Ask for Steve at reception.'}
   ];
   const btn=document.querySelector('[data-act="examples"]');if(btn)btn.disabled=true;
   for(const e of ex){const body=Object.assign({date:d,assignee:'',address:'',phone:'',description:'',notes:'',bay:'',paid:false,createdAt:Date.now(),updatedAt:Date.now()},e);
