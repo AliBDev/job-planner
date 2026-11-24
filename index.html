@@ -397,6 +397,8 @@ body.boardmode::before{background:#0B0F13}
 .b-grid{flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(10px,1.3vw,32px);min-height:0}
 @media (max-width:820px){.b-grid{grid-template-columns:minmax(0,1fr)}}
 .b-col{--c:var(--b-next);display:flex;flex-direction:column;gap:clamp(8px,.8vw,20px);min-width:0;min-height:0;background:#10161C;border-radius:14px;border-top:6px solid var(--c);padding:clamp(10px,1vw,24px)}
+.b-col{position:relative}
+.b-below{position:absolute;left:50%;bottom:clamp(8px,.8vw,20px);transform:translateX(-50%);background:#F5C518;color:#111111;font-weight:700;border-radius:999px;padding:.25em .9em;font-size:clamp(12px,1.1vw,26px);white-space:nowrap;pointer-events:none}
 .b-col.prog{--c:var(--b-prog)}.b-col.done{--c:var(--b-done)}
 .b-colh{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .b-colh h2{margin:0;font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:clamp(16px,1.6vw,38px)}
@@ -1729,7 +1731,7 @@ function renderBoard(force){
       (kind!=='done'&&desc?'<div class="b-desc">'+esc(desc)+'</div>':'')+
       '<div class="b-foot">'+(tn?'<span class="b-who">'+jobAv(j,'md')+esc(tn)+'</span>':'<span class="b-need">Needs a technician</span>')+flag+'</div></article>'};
   const col=(title,list,kind,empty,max)=>{
-    const shown=max&&list.length>max?list.slice(-max):list;const more=list.length-shown.length;
+    const shown=list;const more=0;
     return '<section class="b-col '+kind+(list.length>2?' dense':'')+(list.length>4?' xdense':'')+'" aria-label="'+esc(title)+'"><header class="b-colh"><h2>'+esc(title)+'</h2><span class="b-count">'+list.length+'</span></header><div class="b-list">'+
       (list.length?(more?'<div class="b-more">+'+more+' earlier</div>':'')+shown.map(j=>card(j,kind,list.length>4)).join(''):'<div class="b-empty">'+esc(empty)+'</div>')+'</div></section>'};
   const tf=tmrList[0];
@@ -1740,12 +1742,24 @@ function renderBoard(force){
     '<div class="b-days"><button class="b-btn" data-act="board-day" data-v="-1" aria-label="Previous day">&lsaquo;</button><label class="sr" for="b-date">Choose a day</label><input type="date" id="b-date" class="b-date" value="'+esc(t)+'"><button class="b-btn" data-act="board-day" data-v="1" aria-label="Next day">&rsaquo;</button>'+(isToday?'':'<button class="b-btn b-today" data-act="board-day" data-v="today">Back to today</button>')+'</div>'+
     '<div class="b-sum"><span><b>'+next.length+'</b> to do</span><span><b>'+prog.length+'</b> in progress</span><span><b>'+done.length+'</b> completed</span></div>'+
     '<div class="b-clock" id="b-clock">'+clockHTML(now)+'</div></header>'+
-    '<div class="b-grid">'+col(isToday?'Up next':'Booked',next,'next',isToday?'Nothing waiting. New unit jobs appear here as soon as they are booked.':'No unit jobs booked for this day.')+col('In progress',prog,'prog',isToday?'No cars being worked on right now.':'Nothing in progress.')+col('Completed',done,'done',isToday?'Nothing finished yet today.':'Nothing completed.',6)+'</div>'+
+    '<div class="b-grid">'+col(isToday?'Up next':'Booked',next,'next',isToday?'Nothing waiting. New unit jobs appear here as soon as they are booked.':'No unit jobs booked for this day.')+col('In progress',prog,'prog',isToday?'No cars being worked on right now.':'Nothing in progress.')+col('Completed',done,'done',isToday?'Nothing finished yet today.':'Nothing completed.')+'</div>'+
     '<footer class="b-bot"><span>'+tmrTxt+'</span>'+(off?'<span class="b-off">Offline</span>':'<span class="b-live">Live · last change '+(S.lastSync?hhmm(S.lastSync):'--:--')+'</span>')+
     '<span class="b-ctl"><button class="b-btn" data-act="board-priv">'+(priv?'Show names':'Hide names')+'</button><button class="b-btn" data-act="board-full">Full screen</button><button class="b-btn" data-act="board-exit">Back to app</button></span></footer>';
   S.bScroll=S.bScroll||{};
   el.querySelectorAll('.b-col').forEach(c=>{const l=c.querySelector('.b-list');if(!l)return;const k=c.getAttribute('aria-label');
     if(S.bScroll[k])l.scrollTop=S.bScroll[k];c.classList.toggle('over',l.scrollHeight>l.clientHeight+2)});
+  boardOverflow();
+}
+/* tell the room when a column has jobs below the visible part, so nothing is missed on a full screen */
+function boardOverflow(){
+  document.querySelectorAll('#board .b-col').forEach(c=>{
+    const l=c.querySelector('.b-list');if(!l)return;let pill=c.querySelector('.b-below');
+    const lb=l.getBoundingClientRect().bottom;
+    const hid=[].filter.call(l.querySelectorAll('.b-card'),x=>x.getBoundingClientRect().bottom>lb+4).length;
+    if(!hid){if(pill)pill.remove();return}
+    if(!pill){pill=document.createElement('div');pill.className='b-below';c.appendChild(pill)}
+    pill.textContent='\u25BC '+hid+' more below';
+  });
 }
 let wakeLock=null;
 async function wake(){try{if(S.mode==='board'&&!wakeLock&&navigator.wakeLock&&document.visibilityState==='visible'){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}
@@ -1783,6 +1797,7 @@ setInterval(()=>{
     try{l.scrollTo({top:to,behavior:'smooth'})}catch(e){l.scrollTop=to}
     S.bScroll[k]=to;
   });
+  setTimeout(boardOverflow,900);
 },5000);
 window.addEventListener('offline',()=>{S.offline=true;if(S.ready&&S.mode==='board')renderBoard()});
 window.addEventListener('online',()=>{setTimeout(()=>{S.offline=false;if(S.ready&&S.mode==='board')renderBoard()},3000)});
