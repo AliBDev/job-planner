@@ -83,6 +83,7 @@ h1{margin:0;font-family:var(--display);font-weight:700;font-size:30px;line-heigh
 .wbtn{background:transparent;border:1px solid var(--head-line);color:var(--head-soft);border-radius:999px;min-width:36px;height:32px;padding:0 10px;font-size:13px;font-weight:600}
 .days{display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;position:relative;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;margin-inline:-4px;padding-inline:4px}
 .days::-webkit-scrollbar{display:none}
+.pbar{background:var(--head);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .days .day{flex:0 0 calc((100% - 24px)/7);min-width:0;scroll-snap-align:start}
 .days .day.wk{position:relative}
 .days .day.wk::before{content:'';position:absolute;left:-3px;top:6px;bottom:6px;width:2px;border-radius:1px;background:#5F7080}
@@ -894,7 +895,7 @@ function dayLabelFromScroll(){
   const step=b.offsetWidth+4;const idx=Math.max(0,Math.round((strip.scrollLeft+strip.clientWidth/2-4)/step-.5));
   const d=parse(addDays(strip.dataset.first,idx));mo.textContent=MONL[d.getMonth()]+' '+d.getFullYear();
 }
-document.addEventListener('scroll',e=>{if(e.target&&e.target.id==='days'){cancelAnimationFrame(S.dlf);S.dlf=requestAnimationFrame(dayLabelFromScroll)}},true);
+document.addEventListener('scroll',e=>{if(e.target&&e.target.id==='pdays'){cancelAnimationFrame(S.pdf);S.pdf=requestAnimationFrame(pDayLabel)}if(e.target&&e.target.id==='days'){cancelAnimationFrame(S.dlf);S.dlf=requestAnimationFrame(dayLabelFromScroll)}},true);
 /* On-screen keyboard: lift the sheet above it so every field can be scrolled into view */
 (function(){
   const vv=window.visualViewport;if(!vv)return;
@@ -972,23 +973,61 @@ function renderMine(){
     let cur='';
     rest.forEach(j=>{if(j.date!==cur){cur=j.date;h+='<div class="sec"><h2>'+esc(j.date===t?(next?'Also today':'Today'):relDay(j.date))+'</h2></div>'}h+=card(j,{who:false})});
   }
-  /* past jobs */
-  const pastShown=S.showPast;
-  if(!pastShown)h+='<div class="sec"><h2>Past jobs</h2></div><button class="btn soft" data-act="past-show" style="align-self:flex-start">Show my past jobs</button>';
-  else{
-    const past=S.jobs.filter(j=>j.date<t&&j.status!=='cancelled').sort((a,b)=>a.date===b.date?String(b.start||'').localeCompare(String(a.start||'')):(a.date<b.date?1:-1));
-    const n=S.pastN||30,list=past.slice(0,n);
-    h+='<div class="sec"><h2>Past jobs</h2><span class="meta">'+past.length+(past.length===1?' job':' jobs')+'</span></div>';
-    if(!S.pastReady)h+='<p class="note">Loading all your past jobs…</p>';
-    else if(!past.length)h+='<p class="note">No past jobs yet.</p>';
-    let cur='';
-    list.forEach(j=>{if(j.date!==cur){cur=j.date;h+='<div class="sec"><h2>'+esc(shortDay(j.date)+(j.date.slice(0,4)!==t.slice(0,4)?' '+j.date.slice(0,4):''))+'</h2></div>'}h+=card(j,{who:false})});
-    if(past.length>n)h+='<button class="btn ghost" data-act="past-more" style="align-self:flex-start">Show more ('+(past.length-n)+' older)</button>';
-    h+='<button class="btn ghost" data-act="past-hide" style="align-self:flex-start">Hide past jobs</button>';
+  /* past jobs: day strip (same look as the manager's schedule) + optional full list */
+  {
+    const yest=addDays(t,-1);
+    const pastAllJobs=S.jobs.filter(j=>j.date<t&&j.status!=='cancelled');
+    const cnt={};pastAllJobs.forEach(j=>{cnt[j.date]=(cnt[j.date]||0)+1});
+    if(!S.pPicked){const latest=pastAllJobs.reduce((m,j)=>j.date>m?j.date:m,'');S.pDay=latest||yest}
+    const sel=S.pDay;
+    let lo=addDays(t,-35);if(sel<lo)lo=addDays(sel,-3);
+    pastAllJobs.forEach(j=>{if(j.date<lo)lo=j.date});
+    let ds='';
+    for(let d=lo;d<=yest;d=addDays(d,1)){const n=cnt[d]||0,dd=parse(d);
+      ds+='<button class="day'+(d===sel?' sel':'')+(dd.getDay()===1?' wk':'')+'" data-act="pday" data-v="'+d+'" aria-label="'+esc(longDay(d))+', '+n+' jobs"'+(d===sel?' aria-current="date"':'')+'><span>'+DOW[dd.getDay()]+'</span><span class="n">'+dd.getDate()+'</span><span class="c">'+(n||'–')+'</span></button>'}
+    const sd=parse(sel);
+    h+='<div class="sec"><h2>Past jobs</h2><span class="meta">'+pastAllJobs.length+(pastAllJobs.length===1?' job':' jobs')+'</span></div>'+
+      '<div class="pbar"><div class="weekbar"><button class="wbtn" data-act="pweek" data-v="-7" aria-label="Back one week">‹</button><span class="mo" id="pdaymo">'+esc(MONL[sd.getMonth()]+' '+sd.getFullYear())+'</span><label for="p-date" class="sr">Go to date</label><input type="date" id="p-date" class="datepick" max="'+esc(yest)+'" value="'+esc(sel)+'"><button class="wbtn" data-act="pweek" data-v="7" aria-label="Forward one week">›</button></div>'+
+      '<div class="days" id="pdays" data-first="'+esc(lo)+'" role="group" aria-label="Past days. Swipe sideways to see more.">'+ds+'</div></div>';
+    const dayJobs=pastAllJobs.filter(j=>j.date===sel).sort(byStart);
+    h+='<div class="daysum"><span>'+esc(longDay(sel))+'</span><span>'+dayJobs.length+(dayJobs.length===1?' job':' jobs')+'</span></div>';
+    if(!S.pastAll&&sel<addDays(t,-90))h+='<p class="note">Loading older jobs…</p>';
+    else if(!dayJobs.length)h+='<div class="empty"><h3>No jobs this day</h3><p>Pick another day on the strip, or use the date box to jump to a date.</p></div>';
+    else dayJobs.forEach(j=>{h+=card(j,{who:false})});
+    if(!S.showPast)h+='<button class="btn ghost" data-act="past-show" style="align-self:flex-start">Show everything, newest first</button>';
+    else{
+      const past=pastAllJobs.slice().sort((a,b)=>a.date===b.date?String(b.start||'').localeCompare(String(a.start||'')):(a.date<b.date?1:-1));
+      const n=S.pastN||30,list=past.slice(0,n);
+      h+='<div class="sec"><h2>Everything, newest first</h2></div>';
+      if(!S.pastReady)h+='<p class="note">Loading all your past jobs…</p>';
+      let cur='';
+      list.forEach(j=>{if(j.date!==cur){cur=j.date;h+='<div class="sec"><h2>'+esc(shortDay(j.date)+(j.date.slice(0,4)!==t.slice(0,4)?' '+j.date.slice(0,4):''))+'</h2></div>'}h+=card(j,{who:false})});
+      if(past.length>n)h+='<button class="btn ghost" data-act="past-more" style="align-self:flex-start">Show more ('+(past.length-n)+' older)</button>';
+      h+='<button class="btn ghost" data-act="past-hide" style="align-self:flex-start">Hide the full list</button>';
+    }
   }
   h+='<p class="note">You only see jobs the office has given to you.</p><button class="btn ghost" data-act="signout" style="align-self:flex-start">Sign out of '+esc(S.email||'')+'</button>';
+  const oldP=$('#pdays');let keepP=null;
+  if(oldP&&oldP.dataset.first&&!S.pCenter){const b0=oldP.querySelector('.day');const stp=b0?b0.offsetWidth+4:0;if(stp>4)keepP=addDays(oldP.dataset.first,Math.round(oldP.scrollLeft/stp))}
+  const pWas=document.activeElement&&document.activeElement.id==='p-date';
   $('#view').innerHTML=h;
+  if(pWas){const g=$('#p-date');if(g)g.focus()}
+  const ps=$('#pdays');
+  if(ps){
+    const se=ps.querySelector('.day.sel');
+    const center=()=>{if(se)ps.scrollLeft=Math.max(0,se.offsetLeft-4-(ps.clientWidth-se.offsetWidth)/2)};
+    if(S.pCenter||!keepP){const sm=!!S.pCenter&&!!oldP;S.pCenter=false;if(sm&&ps.scrollTo&&se)ps.scrollTo({left:Math.max(0,se.offsetLeft-4-(ps.clientWidth-se.offsetWidth)/2),behavior:'smooth'});else center()}
+    else{const kb=ps.querySelector('.day[data-v="'+keepP+'"]');ps.scrollLeft=kb?Math.max(0,kb.offsetLeft-4):0}
+  }
 }
+function pDayLabel(){
+  const strip=$('#pdays'),mo=$('#pdaymo');if(!strip||!mo)return;
+  const b=strip.querySelector('.day');if(!b)return;
+  const step=b.offsetWidth+4;const idx=Math.max(0,Math.round((strip.scrollLeft+strip.clientWidth/2-4)/step-.5));
+  const d=parse(addDays(strip.dataset.first,idx));mo.textContent=MONL[d.getMonth()]+' '+d.getFullYear();
+  if(strip.scrollLeft<80&&!S.pastAll)loadAllPast(); /* reached the oldest loaded day: fetch full history */
+}
+function setPDay(d){const y=addDays(today(),-1);if(d>y)d=y;S.pDay=d;S.pPicked=true;S.pCenter=true;if(d<addDays(today(),-90))loadAllPast();render()}
 
 /* ---------- detail sheet ---------- */
 function findJob(key){return S.jobs.find(j=>j.wid+'/'+j.id===key)}
@@ -1722,7 +1761,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 setInterval(checkDay,60000);
 window.addEventListener('hashchange',()=>{if(S.ready)setBoard(location.hash==='#board')});
 /* the unit screen's date field is picker-only: a click anywhere on it opens the calendar, and typing into the DD/MM/YYYY parts is blocked */
-document.addEventListener('click',ev=>{const t=ev.target;if(t&&t.id==='b-date'){try{t.showPicker()}catch(e){}}});
+document.addEventListener('click',ev=>{const t=ev.target;if(t&&(t.id==='b-date'||t.id==='p-date')){try{t.showPicker()}catch(e){}}});
 document.addEventListener('keydown',ev=>{const t=ev.target;if(!t||t.id!=='b-date'||ev.key==='Tab'||ev.key==='Escape')return;
   ev.preventDefault();if(ev.key==='Enter'||ev.key===' '||ev.key==='ArrowDown'){try{t.showPicker()}catch(e){}}});
 document.addEventListener('focusout',ev=>{if(ev.target&&ev.target.id==='b-date'&&S.ready&&S.mode==='board')setTimeout(renderBoard,0)});
@@ -1779,6 +1818,8 @@ document.addEventListener('click',async ev=>{
   else if(a==='del'){S.confirmDel=true;renderDetail()}
   else if(a==='del-no'){S.confirmDel=false;renderDetail()}
   else if(a==='gsignin'){el.disabled=true;try{await FB.google()}catch(e){el.disabled=false;toast(e&&e.code==='auth/popup-closed-by-user'?'Sign-in was cancelled.':'Google sign-in didn\'t work here. Try the email link instead.')}}
+  else if(a==='pday'){setPDay(v)}
+  else if(a==='pweek'){setPDay(addDays(S.pDay,Number(v)))}
   else if(a==='past-show'){S.showPast=true;S.pastN=30;S.pastReady=!!S.pastAll;loadAllPast();render()}
   else if(a==='past-more'){S.pastN=(S.pastN||30)+30;render()}
   else if(a==='past-hide'){S.showPast=false;render()}
@@ -1859,6 +1900,7 @@ document.addEventListener('change',ev=>{
   if(t.id==='clip-until'){clipSet({until:Number(t.value)||12});return}
   if(t.id==='clip-pick'){clipSet({pick:t.value});return}
   if(t.id==='b-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.bTouch=Date.now();S.bDate=t.value===today()?null:t.value;S.bFresh={};renderBoard(true)}
+  if(t.id==='p-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){setPDay(t.value);return}
   if(t.id==='goto-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){S.day=t.value;S.centerDay=true;render()}
   if(t.form&&t.form.id==='sqform')sqUpdate(t);
   if(t.name==='type'&&t.form&&t.form.id==='jobform')applyType(t.value==='mobile');
