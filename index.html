@@ -651,9 +651,15 @@ function rebuild(){S.jobs=Object.values(S.src).flat();S.lastSync=Date.now();S.of
 function subJobs(key,wid){
   if(S.subs['jobs:'+key])return;
   const cutoff=addDays(today(),-90);
-  S.subs['jobs:'+key]=(S.manager?jobsCol(wid):jobsCol(wid).where('date','>=',cutoff)).onSnapshot(snap=>{
-    S.src[key]=snap.docs.map(d=>Object.assign({},d.data(),{id:d.id,wid:wid||''}));rebuild();
+  S.subs['jobs:'+key]=(S.manager||S.pastAll?jobsCol(wid):jobsCol(wid).where('date','>=',cutoff)).onSnapshot(snap=>{
+    S.src[key]=snap.docs.map(d=>Object.assign({},d.data(),{id:d.id,wid:wid||''}));if(S.pastAll&&key===S.me)S.pastReady=true;rebuild();
   },onErr);
+}
+/* a technician normally loads the last 90 days; "Show past jobs" switches to their full history */
+function loadAllPast(){
+  if(S.pastAll||S.manager)return;S.pastAll=true;
+  const k='jobs:'+S.me;if(S.subs[k]){S.subs[k]();delete S.subs[k]}
+  subJobs(S.me,S.me);
 }
 function subDM(wid){
   if(!FEATURE_MESSAGING||S.subs['dm:'+wid])return;
@@ -965,6 +971,20 @@ function renderMine(){
     const rest=upcoming.filter(j=>j!==next);
     let cur='';
     rest.forEach(j=>{if(j.date!==cur){cur=j.date;h+='<div class="sec"><h2>'+esc(j.date===t?(next?'Also today':'Today'):relDay(j.date))+'</h2></div>'}h+=card(j,{who:false})});
+  }
+  /* past jobs */
+  const pastShown=S.showPast;
+  if(!pastShown)h+='<div class="sec"><h2>Past jobs</h2></div><button class="btn soft" data-act="past-show" style="align-self:flex-start">Show my past jobs</button>';
+  else{
+    const past=S.jobs.filter(j=>j.date<t&&j.status!=='cancelled').sort((a,b)=>a.date===b.date?String(b.start||'').localeCompare(String(a.start||'')):(a.date<b.date?1:-1));
+    const n=S.pastN||30,list=past.slice(0,n);
+    h+='<div class="sec"><h2>Past jobs</h2><span class="meta">'+past.length+(past.length===1?' job':' jobs')+'</span></div>';
+    if(!S.pastReady)h+='<p class="note">Loading all your past jobs…</p>';
+    else if(!past.length)h+='<p class="note">No past jobs yet.</p>';
+    let cur='';
+    list.forEach(j=>{if(j.date!==cur){cur=j.date;h+='<div class="sec"><h2>'+esc(shortDay(j.date)+(j.date.slice(0,4)!==t.slice(0,4)?' '+j.date.slice(0,4):''))+'</h2></div>'}h+=card(j,{who:false})});
+    if(past.length>n)h+='<button class="btn ghost" data-act="past-more" style="align-self:flex-start">Show more ('+(past.length-n)+' older)</button>';
+    h+='<button class="btn ghost" data-act="past-hide" style="align-self:flex-start">Hide past jobs</button>';
   }
   h+='<p class="note">You only see jobs the office has given to you.</p><button class="btn ghost" data-act="signout" style="align-self:flex-start">Sign out of '+esc(S.email||'')+'</button>';
   $('#view').innerHTML=h;
@@ -1759,6 +1779,9 @@ document.addEventListener('click',async ev=>{
   else if(a==='del'){S.confirmDel=true;renderDetail()}
   else if(a==='del-no'){S.confirmDel=false;renderDetail()}
   else if(a==='gsignin'){el.disabled=true;try{await FB.google()}catch(e){el.disabled=false;toast(e&&e.code==='auth/popup-closed-by-user'?'Sign-in was cancelled.':'Google sign-in didn\'t work here. Try the email link instead.')}}
+  else if(a==='past-show'){S.showPast=true;S.pastN=30;S.pastReady=!!S.pastAll;loadAllPast();render()}
+  else if(a==='past-more'){S.pastN=(S.pastN||30)+30;render()}
+  else if(a==='past-hide'){S.showPast=false;render()}
   else if(a==='signout'){try{await FB.signOut()}catch(e){}location.reload()}
   else if(a==='tech-edit'){S.editTech=v;S.editEmail=null;S.confirmRemove=null;render();const i=$('#ed-name');if(i)i.focus()}
   else if(a==='tech-edit-cancel'){S.editTech=null;render()}
