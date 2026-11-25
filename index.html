@@ -929,7 +929,7 @@ function card(j,opt){
   return '<button class="job'+(j.status==='cancelled'?' cancelled':'')+'" data-act="open" data-v="'+esc(key)+'">'+
     '<span class="tcol"><span class="t">'+esc(j.start||'--:--')+'</span><span class="d">'+esc(fmtDur(j.duration))+'</span></span>'+
     '<span class="jbody"><span class="r1"><span class="cust">'+esc(j.customerName||'No customer name')+'</span>'+(opt.price===false?'':'<span class="price">'+money(j.price)+'</span>')+'</span>'+
-    ((j.reg||j.vehicle)?'<span class="veh">'+(j.reg?'<span class="plate">'+esc(j.reg)+'</span>':'')+'<span>'+esc(j.vehicle||'')+'</span></span>':'')+loc+
+    ((j.reg||j.vehicle)?'<span class="veh">'+(j.reg?'<span class="plate">'+esc(j.reg)+'</span>':'')+'<span>'+esc(vehFix(j.vehicle||''))+'</span></span>':'')+loc+
     '<span class="tags">'+typePill(j)+statusPill(j)+payPill(j)+clashPill(j,key)+who+'</span></span></button>';
 }
 function renderSchedule(){
@@ -967,7 +967,7 @@ function renderMine(){
       h+='<div class="sec"><h2>Up next</h2></div><div class="next'+(next.type==='mobile'?'':' unit')+'">'+
         '<div class="tt"><b>'+esc(next.start)+'</b><span class="note">'+esc(fmtDur(next.duration))+' · '+(next.type==='mobile'?'Mobile':'Unit')+'</span></div>'+
         (next.type==='mobile'&&next.address?'<div class="pre" style="font-size:15px">'+esc(next.address)+'</div>':'')+
-        ((next.reg||next.vehicle)?'<div class="veh">'+(next.reg?'<span class="plate">'+esc(next.reg)+'</span>':'')+'<span>'+esc(next.vehicle||'')+'</span></div>':'')+
+        ((next.reg||next.vehicle)?'<div class="veh">'+(next.reg?'<span class="plate">'+esc(next.reg)+'</span>':'')+'<span>'+esc(vehFix(next.vehicle||''))+'</span></div>':'')+
         '<div style="font-size:14px;color:var(--ink-2)"><b style="font-weight:600">'+esc(next.service||'Job')+'.</b> '+esc(next.description||'')+'</div>'+
         (next.paid?'<div class="collect"><span>Paid in full</span><b>'+money(next.price)+'</b></div>':'<div class="collect"><span>To collect from '+esc(next.customerName||'customer')+'</span><b>'+money(bal)+'</b></div>')+
         '<div class="two">'+(next.address?'<a class="btn soft" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(next.address.replace(/\n/g,', '))+'">'+ICON.nav+'Directions</a>':'<button class="btn soft" data-act="open" data-v="'+esc(next.wid+'/'+next.id)+'">Details</button>')+
@@ -1159,7 +1159,7 @@ function renderDetail(){
   let h='<div class="dhead gut"><div class="bar"><button class="linkbtn plain" data-act="close">'+ICON.back+esc(shortDay(j.date))+'</button>'+(canAct?'<button class="linkbtn" data-act="edit">Edit</button>':'')+'</div>'+
     '<div class="tags">'+typePill(j)+statusPill(j)+payPill(j)+'</div>'+
     '<h2>'+esc(j.customerName||'No customer name')+'</h2>'+
-    ((j.reg||j.vehicle)?'<div class="dveh">'+(j.reg?'<span class="plate lg">'+esc(j.reg)+'</span>':'')+'<span>'+esc(j.vehicle||'')+'</span></div>':'')+'</div>';
+    ((j.reg||j.vehicle)?'<div class="dveh">'+(j.reg?'<span class="plate lg">'+esc(j.reg)+'</span>':'')+'<span>'+esc(vehFix(j.vehicle||''))+'</span></div>':'')+'</div>';
   h+='<div class="dbody gut">';
   {const cl=st==='cancelled'?[]:clashesFor(Object.assign({},j,{techId:techIdOf(j)}),S.openKey);if(cl.length)h+='<div class="banner"><b>Time clash.</b> Overlaps with '+clashList(cl)+'.</div>'}
   h+='<div class="box"><div class="grid2"><div class="kv"><span class="lab">When</span><b>'+esc(shortDay(j.date))+'</b><span class="m">'+esc(j.start)+' – '+esc(endTime(j.start,j.duration))+'</span></div>'+
@@ -1223,7 +1223,7 @@ function renderForm(){
   h+='<fieldset><legend>Customer and vehicle</legend><input type="hidden" name="clientId" id="f-clientId" value="'+esc(linkedC?linkedC.id:'')+'"><div id="f-lookup">'+lookupHTML(linkedC)+'</div><div class="f"><label for="f-customerName">Customer name (optional)</label><input id="f-customerName" name="customerName" autocapitalize="words" value="'+esc(j.customerName||'')+'" autocomplete="off"></div>'+
      '<div class="f" id="addr-wrap"'+(mob?'':' hidden')+'><label for="f-address" id="addr-label">'+(mob?'Garage and address':'Customer address (optional)')+'</label><textarea id="f-address" name="address" rows="2">'+esc(j.address||'')+'</textarea></div>'+
      '<div class="f"><label for="f-phone">Phone</label><input id="f-phone" name="phone" type="tel" class="mono" value="'+esc(j.phone||'')+'" autocomplete="off"></div>'+
-     '<div class="regrow"><div class="f"><label for="f-reg">Reg</label><input id="f-reg" name="reg" class="regin" value="'+esc(j.reg||'')+'" autocomplete="off" autocapitalize="characters"></div><div class="f"><label for="f-vehicle">Make and model</label><input id="f-vehicle" name="vehicle" value="'+esc(j.vehicle||'')+'" autocomplete="off"></div></div>'+(DVLA_LOOKUP_URL?'<div class="reglook"><button type="button" class="btn soft sm" id="reglook" data-act="reg-lookup">Look up reg</button><p class="note" id="reg-msg" role="status" aria-live="polite"></p></div>':'')+
+     '<div class="regrow"><div class="f"><label for="f-reg">Reg</label><input id="f-reg" name="reg" class="regin" value="'+esc(j.reg||'')+'" autocomplete="off" autocapitalize="characters"></div><div class="f"><label for="f-vehicle">Make and model</label><input id="f-vehicle" name="vehicle" value="'+esc(vehFix(j.vehicle||''))+'" autocomplete="off"></div></div>'+(DVLA_LOOKUP_URL?'<div class="reglook"><button type="button" class="btn soft sm" id="reglook" data-act="reg-lookup">Look up reg</button><p class="note" id="reg-msg" role="status" aria-live="polite"></p></div>':'')+
      '<label class="check" for="f-saveclient" id="saveclient-wrap"'+(linkedC||!S.manager?' hidden':'')+'><input type="checkbox" id="f-saveclient" name="saveClient">Save to my client list</label></fieldset>';
   h+='<fieldset><legend>The job</legend><div class="presets">'+SERVICES.map(s=>'<button type="button" class="preset'+(svcList(j.service).includes(s)?' on':'')+'" aria-pressed="'+(svcList(j.service).includes(s)?'true':'false')+'" data-act="preset" data-v="'+esc(s)+'">'+esc(s)+'</button>').join('')+'</div>'+
      '<div class="f"><label for="f-service">Service</label><input id="f-service" name="service" value="'+esc(j.service||'')+'" placeholder="Pick one or more above, or type your own"></div>'+
@@ -1292,6 +1292,10 @@ function fillFromClient(c){
   E.clientId.value=c.id;$('#f-lookup').innerHTML=lookupHTML(c);$('#saveclient-wrap').hidden=true;E.saveClient.checked=false;updateLeft();updateClash();
 }
 const titleCase=t=>String(t||'').toLowerCase().replace(/(^|[\s-])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
+/* Words that must always be written in capitals (or a fixed style). Add your own to this list: lower-case word on the left, how it should look on the right. */
+const VEH_WORDS={bmw:'BMW',vw:'VW',mg:'MG',ds:'DS',amg:'AMG',gti:'GTI',gtd:'GTD',gte:'GTE',gts:'GTS',tdi:'TDI',tsi:'TSI',tfsi:'TFSI',fsi:'FSI',cdti:'CDTI',cdi:'CDI',crdi:'CRDi',dci:'dCi',hdi:'HDi',tdci:'TDCi',jtd:'JTD',multijet:'MultiJet',ecoboost:'EcoBoost',suv:'SUV',mpv:'MPV',lcv:'LCV',rs:'RS',st:'ST',gt:'GT',gtc:'GTC',vxr:'VXR',sri:'SRi',gsi:'GSi',cupra:'CUPRA',seat:'SEAT'};
+/* tidy a vehicle text, old or new: only the words in the list above are touched, everything else is left exactly as typed */
+const vehFix=t=>String(t||'').replace(/[A-Za-z]+/g,w=>{const k=w.toLowerCase();return Object.prototype.hasOwnProperty.call(VEH_WORDS,k)?VEH_WORDS[k]:w});
 async function regLookup(){
   const f=$('#jobform');const msg=$('#reg-msg');const btn=$('#reglook');if(!f||!msg||!DVLA_LOOKUP_URL)return;
   const reg=f.elements.reg.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -1303,7 +1307,7 @@ async function regLookup(){
     const d=await r.json().catch(()=>({}));
     if(!$('#reg-msg'))return;   /* form was closed while waiting */
     if(!r.ok){msg.textContent=r.status===404?'No vehicle found for that reg.':r.status===400?'That does not look like a valid reg.':r.status===429?'The lookup is busy, try again in a minute.':r.status===401?'Sign in again, then retry.':'Lookup failed. Fill it in by hand.';return}
-    const make=titleCase(d.make),model=titleCase(d.model);const v=f.elements.vehicle;
+    const make=vehFix(titleCase(d.make)),model=vehFix(titleCase(d.model));const v=f.elements.vehicle;
     const bits=[make,model,titleCase(d.colour),d.year,titleCase(d.fuel),d.cc?d.cc+'cc':''].filter(Boolean).join(', ');
     const mot=d.motExpiry?' MOT to '+d.motExpiry+'.':(d.motStatus?' MOT: '+d.motStatus+'.':'');
     if(!v.value.trim()&&make){v.value=(make+' '+model).trim()+(model?'':' ');v.focus();v.setSelectionRange(v.value.length,v.value.length);msg.textContent=bits+'.'+mot+(model?'':' Add the model.')}
@@ -1506,7 +1510,7 @@ function renderClientView(){
   if(!shown.length)h+='<p class="note">'+(f==='unpaid'?'Nothing outstanding.':'No jobs booked for '+esc(c.name)+' yet.')+'</p>';
   else h+='<div class="list">'+shown.map(j=>{const tn=jobTechName(j);
     return '<button class="crow'+(j.status==='cancelled'?' cancelled':'')+'" data-act="open" data-v="'+esc(j.wid+'/'+j.id)+'"><span class="nm"><b style="font-size:15px">'+esc(shortDay(j.date))+' · '+esc(j.start||'')+'</b>'+
-      ((j.reg||j.vehicle)?'<span class="vline">'+(j.reg?'<span class="plate">'+esc(j.reg)+'</span>':'')+'<span class="vv">'+esc(j.vehicle||'')+'</span></span>':'')+
+      ((j.reg||j.vehicle)?'<span class="vline">'+(j.reg?'<span class="plate">'+esc(j.reg)+'</span>':'')+'<span class="vv">'+esc(vehFix(j.vehicle||''))+'</span></span>':'')+
       '<span>'+esc([j.service||'Job',tn,STATUS[j.status||'booked']].filter(Boolean).join(' · '))+'</span>'+
       '<span class="cost">Price '+money2(j.price)+(Number(j.deposit)?' · Deposit '+money2(j.deposit):'')+' · '+(j.status==='cancelled'?'Cancelled':(j.paid?'Paid in full':'Owes '+money2(jobBal(j))))+'</span></span>'+
       '<span class="cr-r"><span class="price">'+money(j.price)+'</span>'+payPill(j)+'</span></button>'}).join('')+'</div>';
@@ -1734,7 +1738,7 @@ function renderBoard(force){
     const desc=priv?'':[j.description,j.notes].filter(Boolean).join(' · ');
     if(cx)return '<article class="b-card b-c'+(f?' b-new':'')+'"><div class="b-row1"><span class="b-time">'+esc(j.start||'--:--')+'</span>'+(j.reg?'<span class="b-plate">'+esc(j.reg)+'</span>':'')+'<span class="b-model">'+esc(j.service||'Job')+'</span><span class="b-r">'+(f?'<span class="b-tag">'+f.kind+'</span>':'')+'</span></div>'+
       '<div class="b-foot">'+(tn?'<span class="b-who">'+jobAv(j,'md')+esc(tn)+'</span>':'<span class="b-need">Needs a technician</span>')+'<span class="b-dur">'+esc(fmtDur(j.duration))+'</span>'+flag+'</div></article>';
-    return '<article class="b-card'+(f?' b-new':'')+'"><div class="b-row1"><span class="b-time">'+esc(j.start||'--:--')+'</span>'+(j.reg?'<span class="b-plate">'+esc(j.reg)+'</span>':'')+(j.vehicle?'<span class="b-model">'+esc(j.vehicle)+'</span>':'')+
+    return '<article class="b-card'+(f?' b-new':'')+'"><div class="b-row1"><span class="b-time">'+esc(j.start||'--:--')+'</span>'+(j.reg?'<span class="b-plate">'+esc(j.reg)+'</span>':'')+(j.vehicle?'<span class="b-model">'+esc(vehFix(j.vehicle))+'</span>':'')+
       '<span class="b-r">'+(f?'<span class="b-tag">'+f.kind+'</span>':'')+'</span></div>'+
       '<div class="b-svc">'+esc(j.service||'Job')+'<span class="b-cust"> · '+esc(fmtDur(j.duration))+(!priv&&j.customerName?' · '+esc(j.customerName):'')+'</span></div>'+
       (kind!=='done'&&desc?'<div class="b-desc">'+esc(desc)+'</div>':'')+
@@ -1744,7 +1748,7 @@ function renderBoard(force){
     return '<section class="b-col '+kind+(list.length>2?' dense':'')+(list.length>4?' xdense':'')+'" aria-label="'+esc(title)+'"><header class="b-colh"><h2>'+esc(title)+'</h2><span class="b-count">'+list.length+'</span></header><div class="b-list">'+
       (list.length?(more?'<div class="b-more">+'+more+' earlier</div>':'')+shown.map(j=>card(j,kind,list.length>4)).join(''):'<div class="b-empty">'+esc(empty)+'</div>')+'</div></section>'};
   const tf=tmrList[0];
-  const tmrTxt=(isToday?'Tomorrow':esc(shortDay(addDays(t,1))))+': '+tmrList.length+(tmrList.length===1?' unit job':' unit jobs')+(tf?' · first at '+esc(tf.start||'')+(tf.reg?' · '+esc(tf.reg):'')+(tf.vehicle?' '+esc(tf.vehicle):''):'');
+  const tmrTxt=(isToday?'Tomorrow':esc(shortDay(addDays(t,1))))+': '+tmrList.length+(tmrList.length===1?' unit job':' unit jobs')+(tf?' · first at '+esc(tf.start||'')+(tf.reg?' · '+esc(tf.reg):'')+(tf.vehicle?' '+esc(vehFix(tf.vehicle)):''):'');
   const off=!!S.offline;
   el.innerHTML=(off?'<div class="b-offbar" role="alert">Connection lost. Reconnecting… This screen may be out of date.</div>':'')+
     '<header class="b-top"><img class="b-logo" src="assets/logo-tv.png" alt="Custom Remaps UK"><div><div class="b-eyebrow">Unit jobs'+(isToday?'':' · viewing another day')+'</div><h1>'+esc(longDay(t))+'</h1></div>'+
