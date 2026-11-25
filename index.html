@@ -863,6 +863,8 @@ function showState(title,msg){
 }
 function render(){
   if(!S.ready)return;
+  /* a redraw (a sync, a new job) would stop the past-days strip mid-swipe: wait until it settles */
+  if(!S.manager&&S.mode!=='board'&&!S.pCenter&&S.pScrollAt&&Date.now()-S.pScrollAt<120){clearTimeout(S.pDefer);S.pDefer=setTimeout(render,130);return}
   if(S.mode==='board'){renderBoard();ensureNames();return}
   renderTop();renderNav();
   if(S.tab==='schedule')(S.manager?renderSchedule:renderMine)();
@@ -924,7 +926,7 @@ function dayLabelFromScroll(){
   const step=b.offsetWidth+4;const idx=Math.max(0,Math.round((strip.scrollLeft+strip.clientWidth/2-4)/step-.5));
   const d=parse(addDays(strip.dataset.first,idx));mo.textContent=MONL[d.getMonth()]+' '+d.getFullYear();
 }
-document.addEventListener('scroll',e=>{if(e.target&&e.target.id==='pdays'){cancelAnimationFrame(S.pdf);S.pdf=requestAnimationFrame(pDayLabel)}if(e.target&&e.target.id==='days'){cancelAnimationFrame(S.dlf);S.dlf=requestAnimationFrame(dayLabelFromScroll)}},true);
+document.addEventListener('scroll',e=>{if(e.target&&e.target.id==='pdays'){if(Date.now()-(S.pProg||0)>150)S.pScrollAt=Date.now();cancelAnimationFrame(S.pdf);S.pdf=requestAnimationFrame(pDayLabel)}if(e.target&&e.target.id==='days'){cancelAnimationFrame(S.dlf);S.dlf=requestAnimationFrame(dayLabelFromScroll)}},true);
 /* On-screen keyboard: lift the sheet above it so every field can be scrolled into view */
 (function(){
   const vv=window.visualViewport;if(!vv)return;
@@ -1038,17 +1040,19 @@ function renderMine(){
     }
   }
   h+='<p class="note">You only see jobs the office has given to you.</p><button class="btn ghost" data-act="signout" style="align-self:flex-start">Sign out of '+esc(S.email||'')+'</button>';
-  const oldP=$('#pdays');let keepP=null;
-  if(oldP&&oldP.dataset.first&&!S.pCenter){const b0=oldP.querySelector('.day');const stp=b0?b0.offsetWidth+4:0;if(stp>4)keepP=addDays(oldP.dataset.first,Math.round(oldP.scrollLeft/stp))}
+  const oldP=$('#pdays');let keepP=null,keepDx=0;
+  /* remember which day sits at the left edge, and exactly how far in, so a redraw puts the strip back to the pixel */
+  if(oldP&&!S.pCenter){const r=oldP.getBoundingClientRect();const e0=[].find.call(oldP.querySelectorAll('.day'),x=>x.getBoundingClientRect().right>r.left+1);if(e0){keepP=e0.dataset.v;keepDx=e0.getBoundingClientRect().left-r.left}}
   const pWas=document.activeElement&&document.activeElement.id==='p-date';
   $('#view').innerHTML=h;
   if(pWas){const g=$('#p-date');if(g)g.focus()}
   const ps=$('#pdays');
   if(ps){
     const se=ps.querySelector('.day.sel');
+    S.pProg=Date.now(); /* the scroll events from our own repositioning are not the user's swipe */
     const center=()=>{if(se)ps.scrollLeft=Math.max(0,se.offsetLeft-4-(ps.clientWidth-se.offsetWidth)/2)};
     if(S.pCenter||!keepP){const sm=!!S.pCenter&&!!oldP;S.pCenter=false;if(sm&&ps.scrollTo&&se)ps.scrollTo({left:Math.max(0,se.offsetLeft-4-(ps.clientWidth-se.offsetWidth)/2),behavior:'smooth'});else center()}
-    else{const kb=ps.querySelector('.day[data-v="'+keepP+'"]');ps.scrollLeft=kb?Math.max(0,kb.offsetLeft-4):0}
+    else{const kb=ps.querySelector('.day[data-v="'+keepP+'"]');ps.scrollLeft=kb?Math.max(0,kb.getBoundingClientRect().left-ps.getBoundingClientRect().left+ps.scrollLeft-keepDx):0}
   }
 }
 function pDayLabel(){
