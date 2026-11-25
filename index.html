@@ -299,6 +299,7 @@ legend{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:
 .seg .unp-on,.seg .unp input:checked+span{color:var(--bad)}
 .seg .pd-on,.seg .pd input:checked+span{color:var(--ok)}
 .seg .unp,.seg .pd{position:relative}
+.seg.pm button,.seg.pm label span{font-size:13px;white-space:nowrap;padding-inline:2px}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .stat span{font-size:12px;color:var(--muted)}
@@ -918,6 +919,8 @@ function renderNav(){
 }
 const byStart=(a,b)=>(a.date+a.start).localeCompare(b.date+b.start);
 function jobBal(j){return Math.max(0,(Number(j.price)||0)-(Number(j.deposit)||0))}
+const PAYM=[['cash','Cash'],['bank','Bank transfer'],['card','Card payment']];
+const payLabel=j=>{const m=PAYM.find(x=>x[0]===j.payMethod);return m?m[1]:''};
 function payPill(j){if(j.status==='cancelled')return '';return j.paid?'<span class="pill p-paid">Paid</span>':'<span class="pill p-unpaid">Unpaid</span>'}
 function statusPill(j){const s=j.status||'booked';let t=STATUS[s]||'Booked';return '<span class="pill p-'+esc(s)+'">'+esc(t)+'</span>'}
 function typePill(j){return j.type==='mobile'?'<span class="pill p-mobile">Mobile</span>':'<span class="pill p-unit">Unit</span>'}
@@ -1181,8 +1184,9 @@ function renderDetail(){
   h+='<div class="box"><span class="lab">The job</span><b style="font-size:16px">'+esc(j.service||'Not specified')+'</b>'+(j.description?'<p class="pre">'+esc(j.description)+'</p>':'')+'</div>';
   h+='<div class="box"><span class="lab">Payment</span><div class="ln"><span>Price</span><span class="v">'+money2(j.price)+'</span></div>'+
      (Number(j.deposit)?'<div class="ln" style="color:var(--ok)"><span>Deposit paid</span><span class="v">−'+money2(j.deposit)+'</span></div>':'')+
-     '<div class="hr"></div><div class="ln" style="font-weight:600;font-size:16px"><span>'+(j.paid?'Paid in full':'Left to collect')+'</span><span class="v">'+(j.paid?'✓':money2(bal))+'</span></div>'+
-     (canAct?'<div class="seg" role="group" aria-label="Payment"><button class="'+(j.paid?'':'on unp-on')+'" data-act="setpaid" data-v="0" aria-pressed="'+(!j.paid)+'">Unpaid</button><button class="'+(j.paid?'on pd-on':'')+'" data-act="setpaid" data-v="1" aria-pressed="'+(!!j.paid)+'">Paid</button></div>':'')+'</div>';
+     '<div class="hr"></div><div class="ln" style="font-weight:600;font-size:16px"><span>'+(j.paid?'Paid in full'+(payLabel(j)?' · '+esc(payLabel(j)):''):'Left to collect')+'</span><span class="v">'+(j.paid?'✓':money2(bal))+'</span></div>'+
+     (canAct?'<div class="seg" role="group" aria-label="Payment"><button class="'+(j.paid?'':'on unp-on')+'" data-act="setpaid" data-v="0" aria-pressed="'+(!j.paid)+'">Unpaid</button><button class="'+(j.paid?'on pd-on':'')+'" data-act="setpaid" data-v="1" aria-pressed="'+(!!j.paid)+'">Paid</button></div>':'')+
+     (canAct&&j.paid?'<div class="lab" id="pm-lab" style="margin-top:12px">How was it paid?</div><div class="seg pm" role="group" aria-labelledby="pm-lab" style="margin-top:6px">'+PAYM.map(x=>'<button class="'+(j.payMethod===x[0]?'on pd-on':'')+'" data-act="setpm" data-v="'+x[0]+'" aria-pressed="'+(j.payMethod===x[0])+'">'+x[1]+'</button>').join('')+'</div>':'')+'</div>';
   if(j.notes)h+='<div class="box"><span class="lab">Notes</span><p class="pre">'+esc(j.notes)+'</p></div>';
   if(canAct){
     h+='<div style="display:flex;flex-direction:column;gap:8px"><span class="lab" style="padding:0 2px">Status</span><div class="seg" role="group" aria-label="Job status">'+
@@ -1229,7 +1233,7 @@ function renderForm(){
      '<div class="f"><label for="f-service">Service</label><input id="f-service" name="service" value="'+esc(j.service||'')+'" placeholder="Pick one or more above, or type your own"></div>'+
      '<div class="f"><label for="f-description">Description</label><textarea id="f-description" name="description" rows="3">'+esc(j.description||'')+'</textarea></div></fieldset>';
   h+='<fieldset><legend>Price</legend><div class="grid2"><div class="f"><label for="f-price">Job price (£)</label><input id="f-price" name="price" class="mono" inputmode="decimal" value="'+(j.price!=null&&j.price!==''?esc(j.price):'')+'"></div><div class="f"><label for="f-deposit">Deposit paid (£)</label><input id="f-deposit" name="deposit" class="mono" inputmode="decimal" value="'+(j.deposit?esc(j.deposit):'')+'"></div></div>'+
-     '<div class="left"><span>Left to collect</span><b id="f-left">£0.00</b></div><div class="f"><span class="lab" id="paid-lab">Payment</span><div class="seg" role="radiogroup" aria-labelledby="paid-lab"><label class="unp"><input type="radio" name="paid" id="f-paid-no" value="no"'+(j.paid?'':' checked')+'><span>Unpaid</span></label><label class="pd"><input type="radio" name="paid" id="f-paid-yes" value="yes"'+(j.paid?' checked':'')+'><span>Paid</span></label></div></div></fieldset>';
+     '<div class="left"><span>Left to collect</span><b id="f-left">£0.00</b></div><div class="f"><span class="lab" id="paid-lab">Payment</span><div class="seg" role="radiogroup" aria-labelledby="paid-lab"><label class="unp"><input type="radio" name="paid" id="f-paid-no" value="no"'+(j.paid?'':' checked')+'><span>Unpaid</span></label><label class="pd"><input type="radio" name="paid" id="f-paid-yes" value="yes"'+(j.paid?' checked':'')+'><span>Paid</span></label></div></div><div class="f" id="pm-row"'+(j.paid?'':' hidden')+'><span class="lab" id="pm-lab">How was it paid?</span><div class="seg pm" role="radiogroup" aria-labelledby="pm-lab">'+PAYM.map(x=>'<label class="pd"><input type="radio" name="payMethod" value="'+x[0]+'"'+(j.payMethod===x[0]?' checked':'')+'><span>'+x[1]+'</span></label>').join('')+'</div></div></fieldset>';
   h+='<fieldset><legend>Notes</legend><div class="f"><label for="f-notes">Notes for the technician</label><textarea id="f-notes" name="notes" rows="2" placeholder="Garage contact, parking, anything to bring">'+esc(j.notes||'')+'</textarea></div></fieldset>';
   h+='<div id="dup-slot" role="alert"></div>';
   h+='<button type="submit" class="btn pri block" id="f-submit">'+(isNew?'Save job':'Save changes')+'</button></form>';
@@ -1315,14 +1319,14 @@ async function regLookup(){
   }catch(e){if($('#reg-msg'))msg.textContent='Could not reach the lookup. Fill it in by hand.'}
   finally{const b=$('#reglook');if(b)b.disabled=false}
 }
-function updateLeft(){const f=$('#jobform');if(!f)return;const l=Math.max(0,num(f.elements.price.value)-num(f.elements.deposit.value));$('#f-left').textContent=f.elements.paid.value==='yes'?'Paid':money2(l)}
+function updateLeft(){const f=$('#jobform');if(!f)return;const pmr=$('#pm-row');if(pmr)pmr.hidden=f.elements.paid.value!=='yes';const l=Math.max(0,num(f.elements.price.value)-num(f.elements.deposit.value));$('#f-left').textContent=f.elements.paid.value==='yes'?'Paid':money2(l)}
 async function submitForm(f){
   const v=n=>String(f.elements[n].value||'').trim();
   const old=S.editing;
   const techId=v('assignee');const tech=techById(techId);const wid=S.manager?((tech&&tech.uid)||''):S.me;
   const data={type:f.elements.type.value==='mobile'?'mobile':'unit',date:v('date'),start:v('start'),duration:Number(v('duration'))||60,
     bay:v('bay'),address:(f.elements.type.value!=='mobile'&&!old)?'':v('address'),customerName:v('customerName'),phone:v('phone'),reg:v('reg').toUpperCase(),vehicle:v('vehicle'),
-    service:v('service'),description:v('description'),price:num(v('price')),deposit:num(v('deposit')),paid:f.elements.paid.value==='yes',notes:v('notes'),
+    service:v('service'),description:v('description'),price:num(v('price')),deposit:num(v('deposit')),paid:f.elements.paid.value==='yes',payMethod:f.elements.paid.value==='yes'?(f.elements.payMethod.value||''):'',notes:v('notes'),
     clientId:v('clientId'),assignee:wid,techId:tech?tech.id:'',techName:tech?tech.name:'',status:old?(old.status||'booked'):'booked',createdAt:old&&old.createdAt?old.createdAt:Date.now(),updatedAt:Date.now()};
   if(data.type==='mobile')data.bay='';
   if(!data.date||!data.start){toast('Add a date and start time.');return}
@@ -1899,7 +1903,8 @@ document.addEventListener('click',async ev=>{
   else if(a==='client-edit'){const c=S.clients.find(x=>x.id===S.viewClient);if(!c)return;S.clientEdit=Object.assign({},c);S.confirmClientDel=false;S.sheet='client';renderClientForm();$('#panel').scrollTop=0}
   else if(a==='client-back'){const id=S.clientEdit&&S.clientEdit.id;S.clientEdit=null;S.confirmClientDel=false;S.viewClient=id;S.sheet='clientview';renderClientView();$('#panel').scrollTop=0}
   else if(a==='cv-filter'){S.cvFilter=v;renderClientView()}
-  else if(a==='setpaid'){const j=findJob(S.openKey);if(!j)return;const p=v==='1';if(!!j.paid===p)return;await write(()=>jobsCol(j.wid).doc(j.id).update({paid:p,updatedAt:Date.now()}),p?'Marked as paid':'Marked as unpaid')}
+  else if(a==='setpm'){const j=findJob(S.openKey);if(!j||!j.paid)return;const nv=j.payMethod===v?'':v;await write(()=>jobsCol(j.wid).doc(j.id).update({payMethod:nv,updatedAt:Date.now()}),nv?'Payment method saved':'Payment method cleared')}
+  else if(a==='setpaid'){const j=findJob(S.openKey);if(!j)return;const p=v==='1';if(!!j.paid===p)return;await write(()=>jobsCol(j.wid).doc(j.id).update(p?{paid:true,updatedAt:Date.now()}:{paid:false,payMethod:'',updatedAt:Date.now()}),p?'Marked as paid':'Marked as unpaid')}
   else if(a==='client-book'){const c=S.clients.find(x=>x.id===S.viewClient);if(!c)return;S.viewClient=null;S.prefill=c;S.editing=null;S.clientEdit=null;S.sheet='form';renderForm();S.prefill=null}
   else if(a==='client-del'){S.confirmClientDel=true;renderClientForm()}
   else if(a==='client-del-no'){S.confirmClientDel=false;renderClientForm()}
