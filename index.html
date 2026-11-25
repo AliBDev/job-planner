@@ -475,9 +475,13 @@ body.boardmode::before{background:#0B0F13}
 .state h2{margin:0;font-family:var(--display);font-size:22px}
 .state p{margin:0;color:var(--muted);max-width:48ch}
 
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;font-size:14px;max-width:min(92vw,460px);box-shadow:var(--shadow)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top,0px));z-index:60;background:var(--ink);color:var(--bg);border:1px solid #5F7080;padding:11px 16px;border-radius:12px;font-size:14px;max-width:min(92vw,460px);box-shadow:var(--shadow)}
 @media (prefers-reduced-motion: no-preference){
   .panel{animation:up .22s ease-out}
+  .toast.in{animation:tin .32s cubic-bezier(.2,.9,.3,1.15)}
+  .toast.out{animation:tout .26s ease-in forwards}
+  @keyframes tin{from{transform:translate(-50%,-160%);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+  @keyframes tout{from{transform:translate(-50%,0);opacity:1}to{transform:translate(-50%,-160%);opacity:0}}
   @keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
 }
 </style>
@@ -651,7 +655,12 @@ function onErr(e){
   toast('Some data could not load. Pull to refresh or reopen the app.');
 }
 let toastT;
-function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},3600)}
+let toastT2;
+function toast(msg){
+  const t=$('#toast');t.textContent=msg;clearTimeout(toastT);clearTimeout(toastT2);
+  t.classList.remove('in','out');t.hidden=false;void t.offsetWidth;t.classList.add('in'); /* drops in from the top */
+  toastT=setTimeout(()=>{t.classList.remove('in');t.classList.add('out');toastT2=setTimeout(()=>{t.hidden=true;t.classList.remove('out')},270)},3600); /* flies back up */
+}
 
 /* ---------- subscriptions ---------- */
 function rebuild(){S.jobs=Object.values(S.src).flat();S.lastSync=Date.now();S.offline=false;render()}
