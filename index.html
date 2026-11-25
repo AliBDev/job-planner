@@ -436,15 +436,18 @@ body.boardmode::before{background:#0B0F13}
 .b-btn:hover{color:var(--b-ink);border-color:var(--b-mute)}
 .b-splash{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(18px,2.4vw,60px);width:100%;background:transparent;border:0;color:var(--b-ink);font:inherit;cursor:pointer;min-height:70vh}
 .b-saver{position:fixed;inset:0;z-index:50;background:#000;min-height:0;gap:0;overflow:hidden;padding:0;margin:0;width:auto}
-.b-saver .sv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.6s ease}
+.b-saver .sv{position:absolute;inset:0;overflow:hidden;opacity:0;transition:opacity 1.6s ease}
 .b-saver .sv.on{opacity:1}
+.b-saver .sv img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.b-saver .sv .bg{filter:blur(38px) brightness(.55);transform:scale(1.25)}
+.b-saver .sv.por .fg{object-fit:contain}
 .b-saver::after{content:"";position:absolute;inset:auto 0 0 0;height:34%;background:linear-gradient(to top,rgba(0,0,0,.72),transparent);pointer-events:none}
 .b-sbrand,.b-saver .b-sclk,.b-saver .b-shint{position:absolute;z-index:2}
 .b-sbrand{left:clamp(20px,3vw,80px);bottom:clamp(20px,3vw,80px)}
 .b-sbrand img{display:block;height:clamp(34px,4.5vw,110px);width:auto}
 .b-saver .b-sclk{right:clamp(20px,3vw,80px);bottom:clamp(20px,3vw,80px);font-size:clamp(30px,3.6vw,90px)}
 .b-saver .b-shint{left:0;right:0;bottom:clamp(8px,1vw,26px);text-align:center;font-size:clamp(12px,1vw,24px);color:rgba(255,255,255,.6)}
-@media (prefers-reduced-motion: no-preference){.b-saver .sv.on{animation:kb 14s linear forwards}@keyframes kb{from{transform:scale(1)}to{transform:scale(1.07)}}}
+@media (prefers-reduced-motion: no-preference){.b-saver .sv.on .fg{animation:kb 14s linear forwards}@keyframes kb{from{transform:scale(1)}to{transform:scale(1.07)}}}
 .b-slogo{display:block;height:clamp(80px,12vw,300px);width:auto;max-width:80%}
 .b-shint{color:var(--b-mute);font-size:clamp(16px,1.6vw,40px)}
 .b-msg{max-width:560px;display:flex;flex-direction:column;gap:14px;padding-block:10vh}
@@ -1735,9 +1738,9 @@ function renderBoard(force){
     {const n0=new Date();S.bMin=n0.getHours()*60+n0.getMinutes()}
     if(S.saverList&&S.saverList.length){ /* screensaver of car photos (assets/screensaver/images.json) */
       if(el.querySelector('.b-saver'))return; /* already running: don't restart it every minute */
-      el.innerHTML='<button class="b-splash b-saver" data-act="board-unlock" aria-label="Show the unit jobs"><img class="sv" alt=""><img class="sv" alt=""><span class="b-sbrand"><img src="assets/logo-tv.png" alt="Custom Remaps UK"></span><span class="b-clock b-sclk" id="b-clock">'+clockHTML(new Date())+'</span><span class="b-shint">Touch the screen or press OK to show today\'s jobs</span></button>';
+      el.innerHTML='<button class="b-splash b-saver" data-act="board-unlock" aria-label="Show the unit jobs"><div class="sv"><img class="bg" alt=""><img class="fg" alt=""></div><div class="sv"><img class="bg" alt=""><img class="fg" alt=""></div><span class="b-sbrand"><img src="assets/logo-tv.png" alt="Custom Remaps UK"></span><span class="b-clock b-sclk" id="b-clock">'+clockHTML(new Date())+'</span><span class="b-shint">Touch the screen or press OK to show today\'s jobs</span></button>';
       S.sIdx=Math.floor(Math.random()*S.saverList.length);
-      const first=el.querySelector('.sv');first.onload=()=>first.classList.add('on');first.onerror=saverSkip;first.src=S.saverList[S.sIdx];
+      saverShow(el.querySelector('.sv'),S.saverList[S.sIdx],()=>{});
       const sb=el.querySelector('.b-splash');if(sb){try{sb.focus({preventScroll:true})}catch(e){}}
       return;
     }
@@ -1818,18 +1821,24 @@ async function loadSaver(){
     if(S.mode==='board'&&S.bLocked&&list.length){const el=$('#board');if(el&&!el.querySelector('.b-saver'))renderBoard(true)}
   }catch(e){S.saverList=[]}
 }
-function saverSkip(){ /* a picture that won't load is dropped from the list */
-  const bad=this&&this.getAttribute?this.getAttribute('src'):'';
+/* put a photo on a layer: landscape fills the screen; portrait is shown whole over a blurred copy of itself */
+function saverShow(layer,src,done){
+  const fg=layer.querySelector('.fg'),bg=layer.querySelector('.bg');
+  fg.onerror=()=>saverSkip(src);
+  fg.onload=()=>{layer.classList.toggle('por',fg.naturalHeight>fg.naturalWidth*1.05);bg.src=src;layer.classList.add('on');done()};
+  fg.src=src;
+}
+function saverSkip(bad){ /* a picture that won't load is dropped from the list */
   S.saverList=(S.saverList||[]).filter(x=>x!==bad);
   if(!S.saverList.length&&S.bLocked){const el=$('#board');if(el)el.innerHTML='';renderBoard(true)}
-  else saverTick(true);
+  else if(S.bLocked&&!document.querySelector('#board .b-saver .sv.on'))saverShow(document.querySelector('#board .b-saver .sv'),S.saverList[(S.sIdx=0)],()=>{});
 }
 function saverTick(){
   if(S.mode!=='board'||!S.bLocked||!S.saverList||!S.saverList.length)return;
-  const imgs=[].slice.call(document.querySelectorAll('#board .b-saver .sv'));if(imgs.length<2)return;
-  const cur=imgs.find(i=>i.classList.contains('on'))||imgs[0],nxt=imgs.find(i=>i!==cur);
+  const layers=[].slice.call(document.querySelectorAll('#board .b-saver .sv'));if(layers.length<2)return;
+  const cur=layers.find(i=>i.classList.contains('on'))||layers[0],nxt=layers.find(i=>i!==cur);
   S.sIdx=((S.sIdx||0)+1)%S.saverList.length;
-  nxt.onerror=saverSkip;nxt.onload=()=>{nxt.classList.add('on');cur.classList.remove('on')};nxt.src=S.saverList[S.sIdx];
+  saverShow(nxt,S.saverList[S.sIdx],()=>cur.classList.remove('on'));
 }
 setInterval(saverTick,10000);
 let wakeLock=null;
