@@ -618,7 +618,7 @@ const endTime=(st,m)=>{if(!st)return'';const p=st.split(':').map(Number);const t
 const hhmm=ts=>{const d=new Date(ts);return pad(d.getHours())+':'+pad(d.getMinutes())};
 const firstLine=s=>String(s||'').split('\n')[0];
 /* The quick-pick service buttons on the job form. To change them, edit this list: keep the quotes and commas. A job can have several. */
-const SERVICES=['DPF','EGR','AdBlue','Stage 1 Tuning','Economy Tuning','Gearbox Tuning','Dyno Run','Diagnostics'];
+const SERVICES=['DPF','EGR','AdBlue','NOx','Stage 1 Tuning','Economy Tuning','Gearbox Tuning','Dyno Run','Diagnostics'];
 const svcList=v=>String(v||'').split(',').map(x=>x.trim()).filter(Boolean); /* the service field holds the chosen services separated by commas */
 function markPresets(val){const l=svcList(val);document.querySelectorAll('.preset').forEach(b=>{const on=l.includes(b.dataset.v);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false')})}
 const nowHHMM=()=>{const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')};
